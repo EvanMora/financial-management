@@ -4,4 +4,4 @@ app = FastAPI()
 
 @app.get("/")
 def home():
-    return {"mensaje": "Hola bibliopedia"}
+    return {"mensaje": "Hola gestion finanzas"}
