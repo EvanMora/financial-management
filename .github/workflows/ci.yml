@@ -1,0 +1,36 @@
+name: CI Pipeline
+
+# 1. ¿Cuándo se activa este robot?
+on:
+  push:
+    branches: [ develop, main ]
+  pull_request:
+    branches: [ develop, main ]
+
+# 2. ¿Qué tareas va a realizar?
+jobs:
+  test:
+    runs-on: ubuntu-latest # Una computadora virtual limpia con Linux (Ubuntu)
+
+    steps:
+    # Paso 1: Descargar el código fuente de tu repositorio en la máquina virtual
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    # Paso 2: Configurar la versión de Python que usa tu proyecto
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+        cache: 'pip' # Opcional: acelera la instalación guardando en caché las librerías
+
+    # Paso 3: Instalar las dependencias listadas en tu requirements.txt
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    # Paso 4: Ejecutar Pytest para verificar que todo funcione bien
+    - name: Run Pytest
+      run: |
+        pytest

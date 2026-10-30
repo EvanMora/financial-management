@@ -1,0 +1,33 @@
+# --- Python & Entornos Virtuales ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.venv/
+env/
+venv/
+ENV/
+
+# --- Variables de Entorno y Configuración Local ---
+.env
+
+# --- Base de Datos SQLite ---
+# Evita que se suban los archivos de bases de datos locales de desarrollo
+data/*.db
+data/*.sqlite
+data/*.sqlite3
+*.db
+*.sqlite
+*.sqlite3
+
+# --- Prueban y Cobertura (Pytest) ---
+.pytest_cache/
+.coverage
+htmlcov/
+*.log
+
+# --- Editores e IDEs ---
+.vscode/
+.idea/
+*.swp
+*.swo
