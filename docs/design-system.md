@@ -70,6 +70,18 @@ Solo para paneles que **flotan sobre contenido** (como la vista previa del login
 
 El fondo del login usa además **barras de vidrio verde** (cápsulas translúcidas con brillo en el borde superior). Son decoración, no una gráfica: no tienen ejes ni etiquetas, así que no siguen las reglas de la sección Gráficas. Se eligieron entre cinco variantes (verde sólido, degradado, grafito, azul y vidrio).
 
+## Estructura de la app
+
+Después del login la app es una aplicación con **barra lateral**, no una página larga con scroll: cada función (Resumen, Movimientos, Cuentas, Categorías) está a un clic. La plantilla base es `app/templates/app/base_app.html` y sus estilos están en `app/static/css/app.css`.
+
+- **Barra lateral:** 248px abierta y 76px contraída (solo íconos, con el nombre en `title`). Es blanca, se separa del contenido con una línea de 1px y no tiene sombra. La sección activa lleva una píldora `--color-canvas`.
+- **Contraer:** el estado se guarda en la cookie `barra_contraida` para que el servidor pinte la barra ya contraída. Si se guardara en `localStorage`, la barra aparecería abierta un instante en cada página.
+- **"Nuevo movimiento"** va arriba en la barra en negro (`btn--ink`), como "Crear cuenta" en el login. El azul queda libre para la acción principal de cada pantalla.
+- **Secciones de la Fase 2** (Presupuestos, Metas) aparecen desactivadas con la etiqueta "Fase 2".
+- **Barra superior:** título de la sección y sus acciones (por ejemplo, el selector de mes). Es fija y translúcida, como la barra del login.
+- **Celular (≤ 760px):** la barra se vuelve un cajón que entra desde la izquierda sobre el contenido. Como flota sobre contenido, es el único lugar de la app con vidrio.
+- **Una ruta por sección.** El paso de una a otra lo anima el navegador con View Transitions (`@view-transition`): la barra se queda quieta, la píldora se desliza a la nueva sección y el contenido viejo se desvanece mientras el nuevo entra escalonado (`style="--i: n"`). En Firefox la página cambia sin animación.
+
 ## Movimiento
 
 - Duraciones: `--duration-fast` (hover y foco), `--duration-default` (cambios de estado), `--duration-slow` (entradas de paneles).
