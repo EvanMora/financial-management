@@ -70,5 +70,34 @@ def test_login_redirige_al_resumen():
 
 
 def test_archivos_de_la_app():
-    for path in ("/static/css/app.css", "/static/css/resumen.css", "/static/js/app-shell.js"):
+    for path in ("/static/css/app.css", "/static/css/resumen.css", "/static/css/movimientos.css",
+                 "/static/js/app-shell.js"):
+        assert client.get(path).status_code == 200, path
+
+
+@pytest.mark.parametrize("seccion", SECCIONES)
+def test_dialogo_en_todas_las_secciones(seccion):
+    html = client.get(f"/{seccion}").text
+
+    assert 'id="dialogo-movimiento"' in html
+    assert html.count('data-tipo="gasto"') == 5 and html.count('data-tipo="ingreso"') == 2
+    assert f'max="{date.today().isoformat()}"' in html
+    assert 'maxlength="80"' in html
+    assert 'data-toast' in html
+
+
+def test_boton_nuevo_movimiento():
+    html = client.get("/resumen").text
+
+    assert 'href="/movimientos?nuevo=1"' in html
+    assert "data-nuevo-movimiento" in html
+
+
+def test_scripts_del_dialogo():
+    html = client.get("/resumen").text
+
+    assert "js/movimiento-dialogo.js" in html
+    assert "js/movimientos.js" not in html  # solo en Movimientos
+    assert "js/movimientos.js" in client.get("/movimientos").text
+    for path in ("/static/js/movimiento-dialogo.js", "/static/js/movimientos.js"):
         assert client.get(path).status_code == 200, path

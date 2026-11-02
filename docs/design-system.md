@@ -82,6 +82,17 @@ Después del login la app es una aplicación con **barra lateral**, no una pági
 - **Celular (≤ 760px):** la barra se vuelve un cajón que entra desde la izquierda sobre el contenido. Como flota sobre contenido, es el único lugar de la app con vidrio.
 - **Una ruta por sección.** El paso de una a otra lo anima el navegador con View Transitions (`@view-transition`): la barra se queda quieta, la píldora se desliza a la nueva sección y el contenido viejo se desvanece mientras el nuevo entra escalonado (`style="--i: n"`). En Firefox la página cambia sin animación.
 
+## Formularios y diálogos de la app
+
+Los controles nuevos de la sección Movimientos salen de los del login. No agregan colores, radios ni sombras. Están en `app.css` porque el diálogo se usa en todas las secciones.
+
+- **Control segmentado** (`.segmented`): radios nativos ocultos dentro de una píldora `--color-canvas`. La opción elegida es una píldora blanca con `--ring-strong`, el token de "control seleccionado". Se usa para Todos/Ingresos/Gastos en los filtros y para Gasto/Ingreso en el diálogo.
+- **Select en píldora** (`.select`, `.select--lg` dentro de formularios): mismo borde, hover y foco que `.float-field__input`, con una flecha propia en SVG.
+- **Diálogo** (`.dialog`, un `<dialog>` nativo): tarjeta blanca de 28px **sin sombra** sobre el mismo fondo oscuro del cajón del celular (`rgba(29, 29, 31, 0.18)`). Mide 480px en escritorio y ocupa toda la pantalla en el celular. Los campos, los errores por campo, `.alert--danger` y el botón con spinner y check son los del login. Se cierra con ×, con Esc o haciendo clic en el fondo.
+- **Botón destructivo** (`.btn--danger`): fondo `--color-danger`. Solo se usa para confirmar una eliminación. Antes de confirmar, la acción es un botón de texto rojo ("Eliminar movimiento").
+- **Aviso** (`.toast`): píldora negra como "Nuevo movimiento", abajo al centro, 4 s, con `role="status"`. Confirma una acción ("Movimiento guardado"), nunca muestra errores; los errores van dentro del formulario.
+- **Montos con signo**: el balance y el neto de cada día son verdes con "+" si son positivos o cero, y van en el color del texto con "−" si son negativos. Nunca rojos: el rojo queda para errores y excesos de presupuesto.
+
 ## Movimiento
 
 - Duraciones: `--duration-fast` (hover y foco), `--duration-default` (cambios de estado), `--duration-slow` (entradas de paneles).

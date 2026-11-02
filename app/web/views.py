@@ -1,15 +1,20 @@
 """Rutas que devuelven HTML renderizado con Jinja2."""
+import re
 from datetime import date
 from pathlib import Path
+from urllib.parse import urlencode
 
 from fastapi import APIRouter, Query, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
+from app.schemas.movimientos import FiltrosMovimientos
+from app.services import movimientos as movimientos_servicio
 from app.services.dashboard import obtener_resumen
 from app.web import formato
-from app.web.presentacion import vista_resumen
+from app.web.presentacion import vista_movimientos, vista_resumen
 from app.web.preview import build_preview
+from app.web.sesion import USUARIO_DEMO
 
 APP_DIR = Path(__file__).resolve().parent.parent
 
@@ -32,17 +37,20 @@ SECCIONES = [
 ]
 PROXIMAMENTE = [("Presupuestos", "presupuestos"), ("Metas", "metas")]
 
-# TODO(backend): cambiar por el usuario de la sesión cuando exista el login real.
-USUARIO_DEMO = {"id": 1, "nombre": "Laura Martínez", "correo": "laura@correo.com", "iniciales": "LM"}
 
 
 def _contexto_app(request: Request, seccion: str) -> dict:
+    cuentas, categorias = movimientos_servicio.catalogo(USUARIO_DEMO["id"])
     return {
         "seccion": seccion,
         "secciones": SECCIONES,
         "proximamente": PROXIMAMENTE,
         "usuario": USUARIO_DEMO,
         "barra_contraida": request.cookies.get(COOKIE_BARRA) == "1",
+        # Para el diálogo "Nuevo movimiento", que está en todas las secciones.
+        "catalogo_cuentas": cuentas,
+        "catalogo_categorias": categorias,
+        "hoy_iso": movimientos_servicio.hoy().isoformat(),
     }
 
 
@@ -93,10 +101,61 @@ def _seccion_pendiente(request: Request, seccion: str, nombre: str, texto: str):
     return templates.TemplateResponse(request, "app/pendiente.html", context)
 
 
+def _entero(valor: str | None) -> int | None:
+    """Número de la URL, o None. No usa str.isdigit(): acepta "²" y luego int() falla."""
+    return int(valor) if valor and re.fullmatch(r"[0-9]{1,9}", valor) else None
+
+
+def _id_valido(valor: str | None, validos: set[int]) -> int | None:
+    """Un id de la URL solo cuenta si es un número que existe en el catálogo; si no, se ignora."""
+    numero = _entero(valor)
+    return numero if numero in validos else None
+
+
+def _filtros(tipo: str | None, cuenta: str | None, categoria: str | None, q: str | None) -> FiltrosMovimientos:
+    cuentas, categorias = movimientos_servicio.catalogo(USUARIO_DEMO["id"])
+    texto = (q or "").strip()[:80]
+    return FiltrosMovimientos(
+        tipo=tipo if tipo in ("ingreso", "gasto") else None,
+        cuenta_id=_id_valido(cuenta, {c.id for c in cuentas}),
+        categoria_id=_id_valido(categoria, {c.id for c in categorias}),
+        q=texto or None,
+    )
+
+
+def _consulta(f: FiltrosMovimientos) -> str:
+    """Los filtros activos como parámetros de URL, para que el selector de mes los conserve."""
+    pares = {"tipo": f.tipo, "cuenta": f.cuenta_id, "categoria": f.categoria_id, "q": f.q}
+    return urlencode({k: v for k, v in pares.items() if v})
+
+
 @router.get("/movimientos", response_class=HTMLResponse)
-def movimientos(request: Request):
-    return _seccion_pendiente(request, "movimientos", "Movimientos",
-                              "Aquí vas a ver y filtrar todos tus ingresos y gastos, agrupados por día.")
+def movimientos(
+    request: Request,
+    anio: int | None = Query(None, ge=2000, le=2100),
+    mes: int | None = Query(None, ge=1, le=12),
+    tipo: str | None = None,
+    cuenta: str | None = None,
+    categoria: str | None = None,
+    q: str | None = None,
+    nuevo: str | None = None,
+    guardado: str | None = None,
+):
+    anio, mes = _periodo(anio, mes)
+    filtros = _filtros(tipo, cuenta, categoria, q)
+    lista = movimientos_servicio.listar(USUARIO_DEMO["id"], anio, mes, filtros)
+    cuentas, categorias = movimientos_servicio.catalogo(USUARIO_DEMO["id"])
+    context = _contexto_app(request, "movimientos") | {
+        "lista": lista,
+        "vista": vista_movimientos(lista),
+        "periodo": _navegacion_mes(anio, mes),
+        "consulta": _consulta(filtros),
+        "cuentas": cuentas,
+        "categorias": categorias,
+        "abrir_dialogo": nuevo == "1",
+        "guardado": _entero(guardado),
+    }
+    return templates.TemplateResponse(request, "app/movimientos.html", context)
 
 
 @router.get("/cuentas", response_class=HTMLResponse)
