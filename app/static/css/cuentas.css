@@ -137,6 +137,8 @@
 }
 
 .cuentas-pagar {
+  flex: none;
+  white-space: nowrap;
   padding: 6px 14px;
   font-size: var(--text-caption);
 }

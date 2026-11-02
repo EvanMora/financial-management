@@ -378,3 +378,21 @@ def test_los_estaticos_piden_revalidar():
     r = client.get("/static/css/app.css")
 
     assert r.headers["cache-control"] == "no-cache"
+
+
+def test_el_prompt_lleva_nombres_de_cuentas_pero_no_saldos(monkeypatch):
+    from decimal import Decimal
+
+    from app.schemas.cuentas import PagoEntrada
+    from app.services import cuentas
+    cuentas.registrar_pago(1, 4, PagoEntrada(monto=Decimal("300000"), cuenta_origen_id=1, fecha=date(2026, 11, 12)))
+    prompts = gemini_responde(monkeypatch, cuenta_id=4)
+
+    r = client.post(URL, json={"texto": "pagué 20.000 con la tarjeta"})
+
+    prompt = prompts[0]
+    assert "- 4: Tarjeta de crédito" in prompt and "- 2: Billetera digital" in prompt
+    for privado in ["3612400", "3.612.400", "3312400", "840000", "840.000", "540000", "3000000", "300000",
+                    "cupo", "saldo", "deuda", "Pago"]:
+        assert privado not in prompt, privado
+    assert r.json()["cuenta_id"] == 4  # una tarjeta sirve para un gasto (es una compra)
