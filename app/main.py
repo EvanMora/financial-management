@@ -11,4 +11,4 @@ app.include_router(views.router)
 
 @app.get("/")
 def home():
-    return {"mensaje": "Hola bibliopedia"}
+    return {"mensaje": "Hola gestion finanzas"}
