@@ -108,3 +108,19 @@ def test_datos_para_editar():
     assert ahorros["usos"] > 0
     tarjeta = next(d for d in datos if d["id"] == 4)
     assert (tarjeta["saldo"], tarjeta["cupo"], tarjeta["dia_pago"]) == ("840000", "3000000", 15)
+
+
+def test_dialogo_de_pago():
+    h = html()
+
+    assert 'id="dialogo-pago"' in h
+    desde = h.split('id="pago-origen"', 1)[1].split("</select>", 1)[0]
+    assert desde.count("<option value=\"") == 3 + 1  # "Elige una" y las 3 de dinero
+    assert "Tarjeta de crédito" not in desde
+    assert 'id="pago-fecha"' in h and 'max="2026-11-15"' in h
+    datos = json.loads(re.search(r"data-cuentas-dinero='([^']*)'", h).group(1))
+    assert {"id": 1, "nombre": "Cuenta de ahorros", "saldo": "3612400"} in datos
+    tarjetas = json.loads(re.search(r"data-tarjetas='([^']*)'", h).group(1))
+    assert tarjetas == [{"id": 4, "nombre": "Tarjeta de crédito", "deuda": "840000",
+                         "fecha_texto": "Pagar antes del 15 nov"}]
+    assert "js/pago-dialogo.js" in h

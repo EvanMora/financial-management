@@ -851,6 +851,25 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+/* Diálogo de pago de tarjeta (Cuentas y Movimientos). */
+.pago-detalle {
+  margin-top: var(--space-4);
+}
+
+.pago-rapido {
+  display: flex;
+  gap: var(--space-8);
+}
+
+.pago-rapido .btn {
+  font-size: var(--text-caption);
+}
+
+.pago-despues {
+  min-height: 1.4em;
+  text-align: center;
+}
+
 .dialog__confirm p {
   color: var(--color-text-secondary);
 }

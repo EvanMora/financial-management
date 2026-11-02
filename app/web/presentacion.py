@@ -9,6 +9,7 @@ from app.schemas.categorias import CategoriasDelMes
 from app.schemas.cuentas import NOMBRE_TIPO, CuentaConSaldo, PanelCuentas
 from app.schemas.dashboard import ResumenDashboard
 from app.schemas.movimientos import ListaMovimientos, Movimiento
+from app.web.formato import fecha_corta
 
 ALTURA_CAPSULA = 200  # px de la cápsula más alta en "Ingresos vs. gastos"
 
@@ -154,5 +155,6 @@ def datos_pago(panel: PanelCuentas) -> dict:
     return {
         "dinero": [{"id": c.cuenta.id, "nombre": c.cuenta.nombre, "saldo": _decimal(c.saldo)} for c in panel.dinero],
         "tarjetas": [{"id": t.cuenta.id, "nombre": t.cuenta.nombre, "deuda": _decimal(t.saldo),
-                      "fecha_limite": t.fecha_limite.isoformat()} for t in panel.tarjetas],
+                      "fecha_texto": f"Pagar antes del {fecha_corta(t.fecha_limite)}" if t.saldo > 0 else "Al día"}
+                     for t in panel.tarjetas],
     }

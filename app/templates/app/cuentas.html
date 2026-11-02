@@ -127,9 +127,13 @@
 {% endif %}
 {% endblock %}
 
-{% block dialogos %}{% include "app/_dialogo_cuenta.html" %}{% endblock %}
+{% block dialogos %}
+{% include "app/_dialogo_cuenta.html" %}
+{% include "app/_dialogo_pago.html" %}
+{% endblock %}
 
 {% block scripts %}
 {{ super() }}
 <script src="{{ url_for('static', path='js/cuentas.js') }}" defer></script>
+<script src="{{ url_for('static', path='js/pago-dialogo.js') }}" defer></script>
 {% endblock %}
