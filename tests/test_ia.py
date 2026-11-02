@@ -143,13 +143,21 @@ def test_el_asistente_aparece_en_el_dialogo_solo_con_clave(monkeypatch):
     assert "data-ia-texto" not in client.get("/resumen").text
 
 
-def test_el_menu_del_asistente_aparece_en_el_resumen_solo_con_clave(monkeypatch):
-    html = client.get("/resumen").text
-    assert "data-asistente-abrir" in html and "js/asistente.js" in html
+def test_cada_seccion_tiene_su_menu_de_ia_solo_con_clave(monkeypatch):
+    movimientos_html = client.get("/movimientos").text
+    resumen_html = client.get("/resumen").text
+    # Registrar con una frase va en Movimientos; el análisis del mes, en el Resumen.
+    assert "data-asistente " in movimientos_html and "js/asistente.js" in movimientos_html
+    assert "data-analisis " not in movimientos_html
+    assert "data-analisis " in resumen_html and "js/analisis.js" in resumen_html
+    assert "data-asistente " not in resumen_html
+    # Cuentas no tiene IA.
+    cuentas_html = client.get("/cuentas").text
+    assert "data-asistente " not in cuentas_html and "data-analisis " not in cuentas_html
 
     monkeypatch.delenv("GEMINI_API_KEY")
-    html = client.get("/resumen").text
-    assert "data-asistente-abrir" not in html and "js/asistente.js" not in html
+    assert "data-asistente " not in client.get("/movimientos").text
+    assert "data-analisis " not in client.get("/resumen").text
 
 
 # ---------- Límite de consultas por usuario ----------
@@ -219,3 +227,154 @@ def test_el_limite_es_por_usuario(monkeypatch, reloj):
     with pytest.raises(ia.LimiteExcedido):
         ia.interpretar(1, "taxi")
     assert ia.interpretar(2, "taxi").monto == 45000
+
+
+# ---------- Análisis del mes (Resumen) ----------
+
+URL_ANALISIS = "/api/v1/ia/analisis-mes"
+
+
+def gemini_analiza(monkeypatch, observaciones=None, consejo="Revisa tus gastos de Ocio."):
+    """Hace que Gemini devuelva este análisis y guarda las cifras que recibió."""
+    prompts = []
+
+    def falso(prompt):
+        prompts.append(prompt)
+        return ia._AnalisisGemini(observaciones=observaciones or ["El arriendo fue tu mayor gasto."],
+                                  consejo=consejo)
+
+    monkeypatch.setattr(ia, "_analizar_con_gemini", falso)
+    return prompts
+
+
+def test_analisis_del_mes(monkeypatch):
+    gemini_analiza(monkeypatch, observaciones=["Gastaste $1.874.300 en octubre.",
+                                                "El arriendo fue el 58,7 % del gasto."])
+
+    r = client.get(URL_ANALISIS, params={"anio": 2026, "mes": 10})
+
+    assert r.status_code == 200
+    assert r.json() == {"anio": 2026, "mes": 10, "sin_datos": False,
+                        "observaciones": ["Gastaste $1.874.300 en octubre.", "El arriendo fue el 58,7 % del gasto."],
+                        "consejo": "Revisa tus gastos de Ocio."}
+
+
+def test_las_cifras_las_calcula_python_y_no_incluyen_datos_privados(monkeypatch):
+    prompts = gemini_analiza(monkeypatch)
+    # Un gasto extra en octubre para que haya cambio frente a septiembre.
+    movimientos.crear(1, movimientos.MovimientoEntrada(tipo="gasto", monto=100000, categoria_id=6, cuenta_id=1,
+                                                       fecha=date(2026, 10, 5), descripcion="Concierto secreto"))
+
+    client.get(URL_ANALISIS, params={"anio": 2026, "mes": 10})
+
+    cifras = prompts[0]
+    assert "Mes: octubre de 2026." in cifras
+    assert "Ingresos: $3.200.000." in cifras
+    # Los porcentajes llevan espacio de no separación antes del %, como en la pantalla.
+    assert "Gastos: $1.974.300, el 61,7\xa0% de los ingresos." in cifras
+    assert "Quedó: $1.225.700." in cifras
+    assert "- Ocio: $280.000 (14,2\xa0% del gasto); en septiembre fue $180.000, subió 55,6\xa0%." in cifras
+    assert "- Arriendo: $1.100.000 (55,7\xa0% del gasto); igual que en septiembre." in cifras
+    assert "Mes anterior (septiembre): ingresos $3.200.000, gastos $1.874.300." in cifras
+    # Nada de cuentas, saldos ni descripciones.
+    for privado in ("Cuenta de ahorros", "Billetera digital", "Efectivo", "Concierto secreto", "Supermercado"):
+        assert privado not in cifras
+
+
+def test_mes_en_curso_se_marca_como_tal(monkeypatch):
+    prompts = gemini_analiza(monkeypatch)
+
+    client.get(URL_ANALISIS, params={"anio": 2026, "mes": 11})
+
+    assert "El mes va en curso: van 15 de 30 días." in prompts[0]
+
+
+def test_frases_con_cifras_inventadas_se_descartan(monkeypatch):
+    gemini_analiza(monkeypatch,
+                   observaciones=["Gastaste $1.874.300 en octubre.",          # está en las cifras
+                                  "Ahorraste $500.000 más que nunca.",        # inventada
+                                  "El arriendo fue el 60 % del gasto."],      # mal redondeada
+                   consejo="Intenta bajar el Ocio un 20 %.")                  # inventada
+
+    datos = client.get(URL_ANALISIS, params={"anio": 2026, "mes": 10}).json()
+
+    assert datos["observaciones"] == ["Gastaste $1.874.300 en octubre."]
+    assert datos["consejo"] == ""
+
+
+def test_si_todo_es_inventado_responde_503(monkeypatch):
+    gemini_analiza(monkeypatch, observaciones=["Gastaste $9.999 en total."], consejo="Ahorra el 50 %.")
+
+    r = client.get(URL_ANALISIS, params={"anio": 2026, "mes": 10})
+
+    assert r.status_code == 503
+    assert "no pudo analizar" in r.json()["errores"]["general"]
+
+
+def test_mes_sin_movimientos_no_llama_a_gemini(monkeypatch):
+    prompts = gemini_analiza(monkeypatch)
+    monkeypatch.setattr(movimientos, "hoy", lambda: date(2026, 11, 5))  # aún no hay nada sembrado en noviembre
+
+    datos = client.get(URL_ANALISIS, params={"anio": 2026, "mes": 11}).json()
+
+    assert datos["sin_datos"] is True and datos["observaciones"] == []
+    assert prompts == []
+
+
+def test_el_analisis_se_guarda_y_no_gasta_otra_consulta(monkeypatch):
+    prompts = gemini_analiza(monkeypatch)
+
+    primero = client.get(URL_ANALISIS, params={"anio": 2026, "mes": 10}).json()
+    segundo = client.get(URL_ANALISIS, params={"anio": 2026, "mes": 10}).json()
+
+    assert primero == segundo and len(prompts) == 1
+    assert len(ia._consultas[1]) == 1
+
+
+def test_si_cambian_los_movimientos_se_vuelve_a_analizar(monkeypatch):
+    prompts = gemini_analiza(monkeypatch)
+    client.get(URL_ANALISIS, params={"anio": 2026, "mes": 10})
+    movimientos.crear(1, movimientos.MovimientoEntrada(tipo="gasto", monto=5000, categoria_id=4, cuenta_id=3,
+                                                       fecha=date(2026, 10, 2)))
+
+    client.get(URL_ANALISIS, params={"anio": 2026, "mes": 10})
+
+    assert len(prompts) == 2
+
+
+@pytest.mark.parametrize("params", [{}, {"anio": 2026}, {"anio": "x", "mes": 1}, {"anio": 2026, "mes": 13},
+                                    {"anio": 1999, "mes": 1}, {"anio": 2026, "mes": 12}])
+def test_mes_no_valido_o_futuro(monkeypatch, params):
+    prompts = gemini_analiza(monkeypatch)
+
+    r = client.get(URL_ANALISIS, params=params)
+
+    assert r.status_code == 422
+    assert r.json()["errores"]["general"] == "Mes no válido."
+    assert prompts == []
+
+
+def test_analisis_sin_clave_responde_503(monkeypatch):
+    gemini_analiza(monkeypatch)
+    monkeypatch.delenv("GEMINI_API_KEY")
+
+    r = client.get(URL_ANALISIS, params={"anio": 2026, "mes": 10})
+
+    assert r.status_code == 503
+
+
+def test_analisis_respeta_el_limite_de_consultas(monkeypatch, reloj):
+    gemini_responde(monkeypatch)
+    gemini_analiza(monkeypatch)
+    for _ in range(ia.LIMITE_POR_MINUTO):
+        client.post(URL, json={"texto": "taxi"})
+
+    r = client.get(URL_ANALISIS, params={"anio": 2026, "mes": 10})
+
+    assert r.status_code == 429
+
+
+def test_los_estaticos_piden_revalidar():
+    r = client.get("/static/css/app.css")
+
+    assert r.headers["cache-control"] == "no-cache"

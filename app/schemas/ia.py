@@ -1,8 +1,9 @@
-"""Contrato del asistente que completa el diálogo "Nuevo movimiento" a partir de una frase.
+"""Contratos del asistente con Gemini.
 
-El usuario escribe algo como "ayer gasté 45.000 en taxi con efectivo"; Gemini lo interpreta y la
-API devuelve un MovimientoSugerido. Es solo una sugerencia: el diálogo la muestra en el
-formulario y el usuario la revisa y guarda como siempre (POST /api/v1/movimientos).
+- Movimientos: el usuario escribe algo como "ayer gasté 45.000 en taxi con efectivo"; Gemini lo
+  interpreta y la API devuelve un MovimientoSugerido. Es solo una sugerencia: el diálogo la muestra
+  en el formulario y el usuario la revisa y guarda como siempre (POST /api/v1/movimientos).
+- Resumen: AnalisisMes, observaciones y un consejo sobre las cifras del mes.
 """
 from datetime import date
 from decimal import Decimal
@@ -27,3 +28,12 @@ class MovimientoSugerido(BaseModel):
     cuenta_id: int | None = None
     fecha: date | None = None
     descripcion: str = ""
+
+
+class AnalisisMes(BaseModel):
+    """Análisis del Resumen. Texto plano (la plantilla lo muestra como texto, nunca como HTML)."""
+    anio: int
+    mes: int
+    observaciones: list[str]  # de 0 a 3 frases cortas
+    consejo: str              # puede ser ""
+    sin_datos: bool = False   # el mes no tiene movimientos: no se llamó a Gemini

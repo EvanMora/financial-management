@@ -1,13 +1,25 @@
-"""Asistente con Gemini: convierte una frase en un movimiento sugerido.
+"""Asistente con Gemini. Cada sección usa la IA para una cosa distinta:
 
-Flujo: frase del usuario → Gemini responde JSON con la forma de _RespuestaGemini (salida
+- Movimientos — interpretar(): frase → movimiento sugerido para el diálogo "Nuevo movimiento".
+- Resumen — analizar_mes(): cifras del mes → 1 a 3 observaciones y un consejo.
+- Cuentas: sin IA a propósito. Nombres de bancos y saldos son los datos más sensibles de la app y
+  no hacen falta para nada de lo anterior, así que nunca salen hacia Gemini.
+
+Registrar con una frase. Flujo: frase del usuario → Gemini responde JSON con la forma de _RespuestaGemini (salida
 estructurada) → _limpiar() descarta todo lo que no sea válido contra el catálogo y las reglas del
 servicio de movimientos → MovimientoSugerido. Gemini nunca guarda nada: el usuario revisa la
 sugerencia en el diálogo y guarda con la API de siempre.
 
+Análisis del mes. Python calcula todas las cifras (totales, porcentajes, cambio contra el mes
+anterior) y Gemini solo las redacta. Gemini recibe totales por categoría y nada más: ni cuentas, ni
+saldos, ni descripciones de movimientos. Contra alucinaciones, _cifras_validas() descarta toda
+frase que traiga un número que no esté en las cifras que se le dieron. Se guarda en memoria por
+mes y cifras, así que volver a abrir el análisis no gasta otra consulta.
+
 Configuración (variables de entorno o archivo .env, ver .env.example):
 - GEMINI_API_KEY: clave de Google AI Studio. Sin ella el asistente no aparece en el diálogo.
-- GEMINI_MODEL: modelo a usar (por defecto, el Flash más reciente).
+- GEMINI_MODEL: modelo a usar (por defecto, el Flash-Lite más reciente: rápido y de sobra para
+  sacar datos de una frase).
 
 Límite de uso: cada usuario puede consultar a Gemini como máximo LIMITE_POR_MINUTO veces por
 minuto y LIMITE_POR_DIA veces por día, para que nadie gaste la cuota de la clave (que es de toda
@@ -16,6 +28,7 @@ la app). Pasado el límite se lanza LimiteExcedido sin llamar a Gemini.
 import logging
 import math
 import os
+import re
 import threading
 import time
 from collections import defaultdict, deque
@@ -26,13 +39,14 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-from app.schemas.ia import MAX_TEXTO, MovimientoSugerido
+from app.schemas.ia import MAX_TEXTO, AnalisisMes, MovimientoSugerido
 from app.services import movimientos as movimientos_servicio
+from app.web.formato import dinero, nombre_mes, porcentaje
 
 log = logging.getLogger(__name__)
 
-MODELO_POR_DEFECTO = "gemini-flash-latest"
-TIEMPO_MAXIMO_MS = 20_000
+MODELO_POR_DEFECTO = "gemini-flash-lite-latest"
+TIEMPO_MAXIMO_MS = 30_000  # Gemini suele tardar 1-3 s, pero en horas de mucha demanda llega a 20 s
 LIMITE_POR_MINUTO = 10
 LIMITE_POR_DIA = 200
 
@@ -108,7 +122,7 @@ def _registrar_consulta(usuario_id: int) -> None:
                 if segundos == 60:
                     mensaje = f"Hiciste muchas consultas seguidas. Espera {espera} s e inténtalo de nuevo."
                 else:
-                    mensaje = "Llegaste al límite de consultas al asistente por hoy. Llena el formulario a mano."
+                    mensaje = "Llegaste al límite de consultas al asistente por hoy. Vuelve a intentarlo mañana."
                 raise LimiteExcedido(mensaje, espera)
         horas.append(ahora)
 
@@ -157,8 +171,8 @@ def _prompt(usuario_id: int, texto: str) -> str:
     return "\n".join(lineas)
 
 
-def _llamar_gemini(prompt: str) -> _RespuestaGemini:
-    """La única función que habla con Gemini (los tests la reemplazan)."""
+def _generar(prompt: str, instrucciones: str, esquema: type[BaseModel], temperatura: float):
+    """La única función que habla con Gemini: devuelve una instancia de `esquema`."""
     api_key = _api_key()
     if api_key is None:
         raise ErrorIA("El asistente no está configurado.")
@@ -169,18 +183,23 @@ def _llamar_gemini(prompt: str) -> _RespuestaGemini:
             model=os.environ.get("GEMINI_MODEL") or MODELO_POR_DEFECTO,
             contents=prompt,
             config=types.GenerateContentConfig(
-                system_instruction=_INSTRUCCIONES,
+                system_instruction=instrucciones,
                 response_mime_type="application/json",
-                response_schema=_RespuestaGemini,
-                temperature=0,
+                response_schema=esquema,
+                temperature=temperatura,
             ),
         )
-        if isinstance(respuesta.parsed, _RespuestaGemini):
+        if isinstance(respuesta.parsed, esquema):
             return respuesta.parsed
-        return _RespuestaGemini.model_validate_json(respuesta.text or "")
+        return esquema.model_validate_json(respuesta.text or "")
     except Exception as error:  # red, cuota, clave inválida, JSON roto...
         log.warning("Gemini falló: %s: %s", type(error).__name__, error)
-        raise ErrorIA("El asistente no respondió. Llena el formulario o inténtalo de nuevo.") from error
+        raise ErrorIA("El asistente no respondió. Inténtalo de nuevo en un momento.") from error
+
+
+def _llamar_gemini(prompt: str) -> _RespuestaGemini:
+    """Frase → datos del movimiento (los tests la reemplazan)."""
+    return _generar(prompt, _INSTRUCCIONES, _RespuestaGemini, temperatura=0)
 
 
 def _limpiar(usuario_id: int, r: _RespuestaGemini) -> MovimientoSugerido:
@@ -214,3 +233,142 @@ def interpretar(usuario_id: int, texto: str) -> MovimientoSugerido:
     texto = " ".join(texto.split())[:MAX_TEXTO]
     _registrar_consulta(usuario_id)
     return _limpiar(usuario_id, _llamar_gemini(_prompt(usuario_id, texto)))
+
+
+# ---------- Análisis del mes (Resumen) ----------
+
+MAX_FRASE_ANALISIS = 200
+
+_INSTRUCCIONES_ANALISIS = """\
+Eres el asistente de una app de finanzas personales en Colombia. Recibes las cifras de un mes, ya
+calculadas. Escribe en español de Colombia, tuteando, con tono cercano y sin regañar:
+
+- observaciones: de 1 a 3 frases cortas (máximo 160 caracteres cada una) con lo más importante del
+  mes: en qué se fue la mayor parte del gasto, qué cambió frente al mes anterior y cuánto quedó.
+- consejo: una sola frase práctica y concreta basada en esas cifras (máximo 160 caracteres).
+
+Reglas estrictas:
+- Usa SOLO las cifras que se te dan y escríbelas exactamente igual ("$184.300", "38,2 %"). No
+  inventes cifras, no redondees, no hagas cuentas nuevas y no menciones datos que no estén.
+- Si el mes va en curso, no lo compares como si hubiera terminado.
+- No recomiendes bancos, productos financieros, inversiones ni créditos.
+"""
+
+
+class _AnalisisGemini(BaseModel):
+    """Forma exacta del JSON que se le pide a Gemini para el análisis."""
+    observaciones: list[str] = Field(description="De 1 a 3 frases cortas.")
+    consejo: str
+
+
+_NUMERO = re.compile(r"\d+(?:[.,]\d+)*")
+_cache_analisis: dict[tuple, AnalisisMes] = {}
+MAX_CACHE_ANALISIS = 256
+
+
+def reiniciar_cache_analisis() -> None:
+    """Olvida los análisis guardados. Solo para tests."""
+    _cache_analisis.clear()
+
+
+def _gastos_por_categoria(lista) -> dict[str, Decimal]:
+    gastos: dict[str, Decimal] = {}
+    for m in lista.movimientos:
+        if m.tipo == "gasto":
+            gastos[m.categoria.nombre] = gastos.get(m.categoria.nombre, Decimal(0)) + m.monto
+    return gastos
+
+
+def _cifras_mes(usuario_id: int, anio: int, mes: int) -> list[str] | None:
+    """Las cifras que ve Gemini, ya calculadas y con formato. None si el mes no tiene movimientos.
+    Solo totales por categoría: ni cuentas, ni saldos, ni descripciones."""
+    actual = movimientos_servicio.listar(usuario_id, anio, mes)
+    if not actual.movimientos:
+        return None
+    anio_ant, mes_ant = (anio - 1, 12) if mes == 1 else (anio, mes - 1)
+    anterior = movimientos_servicio.listar(usuario_id, anio_ant, mes_ant)
+    nombre, nombre_ant = nombre_mes(mes), nombre_mes(mes_ant)
+
+    lineas = [f"Mes: {nombre} de {anio}."]
+    hoy = movimientos_servicio.hoy()
+    if (anio, mes) == (hoy.year, hoy.month):
+        ultimo = movimientos_servicio._ultimo_dia(anio, mes)
+        lineas.append(f"El mes va en curso: van {hoy.day} de {ultimo} días.")
+
+    lineas.append(f"Ingresos: {dinero(actual.ingresos)}.")
+    gastos_linea = f"Gastos: {dinero(actual.gastos)}"
+    if actual.ingresos:
+        gastos_linea += f", el {porcentaje(float(actual.gastos / actual.ingresos * 100))} de los ingresos"
+    lineas.append(gastos_linea + ".")
+    queda = actual.ingresos - actual.gastos
+    if queda >= 0:
+        lineas.append(f"Quedó: {dinero(queda)}.")
+    else:
+        lineas.append(f"Se gastó {dinero(-queda)} más de lo que entró.")
+
+    gastos = _gastos_por_categoria(actual)
+    gastos_ant = _gastos_por_categoria(anterior)
+    if gastos:
+        lineas.append("Gastos por categoría, de mayor a menor:")
+        for categoria, total in sorted(gastos.items(), key=lambda par: par[1], reverse=True):
+            linea = f"- {categoria}: {dinero(total)} ({porcentaje(float(total / actual.gastos * 100))} del gasto)"
+            antes = gastos_ant.get(categoria)
+            if antes:
+                cambio = float((total - antes) / antes * 100)
+                if abs(cambio) < 0.05:
+                    linea += f"; igual que en {nombre_ant}"
+                else:
+                    sentido = "subió" if cambio > 0 else "bajó"
+                    linea += f"; en {nombre_ant} fue {dinero(antes)}, {sentido} {porcentaje(abs(cambio))}"
+            else:
+                linea += f"; no hubo en {nombre_ant}"
+            lineas.append(linea + ".")
+    if anterior.movimientos:
+        lineas.append(f"Mes anterior ({nombre_ant}): ingresos {dinero(anterior.ingresos)}, "
+                      f"gastos {dinero(anterior.gastos)}.")
+    return lineas
+
+
+def _cifras_validas(frase: str, permitidas: set[str]) -> bool:
+    """True si cada número de la frase aparece tal cual en las cifras que se le dieron a Gemini."""
+    return all(n in permitidas for n in _NUMERO.findall(frase))
+
+
+def _limpiar_analisis(r: _AnalisisGemini, cifras: list[str], anio: int, mes: int) -> AnalisisMes:
+    permitidas = set(_NUMERO.findall("\n".join(cifras)))
+
+    def limpia(frase: str) -> str | None:
+        frase = " ".join(frase.split())
+        if not frase or len(frase) > MAX_FRASE_ANALISIS or not _cifras_validas(frase, permitidas):
+            return None
+        return frase
+
+    observaciones = [f for f in map(limpia, r.observaciones[:3]) if f]
+    consejo = limpia(r.consejo) or ""
+    if not observaciones and not consejo:
+        raise ErrorIA("El asistente no pudo analizar el mes. Inténtalo de nuevo en un momento.")
+    return AnalisisMes(anio=anio, mes=mes, observaciones=observaciones, consejo=consejo)
+
+
+def _analizar_con_gemini(prompt: str) -> _AnalisisGemini:
+    """Cifras → análisis (los tests la reemplazan)."""
+    return _generar(prompt, _INSTRUCCIONES_ANALISIS, _AnalisisGemini, temperatura=0.3)
+
+
+def analizar_mes(usuario_id: int, anio: int, mes: int) -> AnalisisMes:
+    """Observaciones y un consejo sobre el mes. Sin movimientos devuelve sin_datos=True sin llamar a
+    Gemini. Lanza LimiteExcedido o ErrorIA como interpretar()."""
+    cifras = _cifras_mes(usuario_id, anio, mes)
+    if cifras is None:
+        return AnalisisMes(anio=anio, mes=mes, observaciones=[], consejo="", sin_datos=True)
+
+    clave = (usuario_id, anio, mes, "\n".join(cifras))
+    if clave in _cache_analisis:
+        return _cache_analisis[clave]
+
+    _registrar_consulta(usuario_id)
+    analisis = _limpiar_analisis(_analizar_con_gemini("\n".join(cifras)), cifras, anio, mes)
+    if len(_cache_analisis) >= MAX_CACHE_ANALISIS:
+        _cache_analisis.clear()
+    _cache_analisis[clave] = analisis
+    return analisis

@@ -1,20 +1,18 @@
 /*
- * Asistente de la barra superior (botón "Asistente ▾").
- * - El botón despliega el panel; se cierra con Escape, con clic fuera o al volver a pulsar el botón.
+ * Asistente de Movimientos (menú "✦ Asistente ▾" de la barra superior; abrir y cerrar lo maneja
+ * desplegable.js).
  * - Los ejemplos llenan la frase. "Completar" la manda a Gemini (window.dialogoMovimiento.interpretar)
- *   y, si sale bien, cierra el panel y abre "Nuevo movimiento" ya lleno para revisar y guardar.
+ *   y, si sale bien, cierra el menú y abre "Nuevo movimiento" ya lleno para revisar y guardar.
  */
 (() => {
   const raiz = document.querySelector("[data-asistente]");
   if (!raiz) return;
 
-  const boton = raiz.querySelector("[data-asistente-abrir]");
-  const panel = raiz.querySelector("[data-asistente-panel]");
   const form = raiz.querySelector("[data-asistente-form]");
   const texto = raiz.querySelector("[data-asistente-texto]");
   const completar = raiz.querySelector("[data-asistente-completar]");
   const mensaje = raiz.querySelector("[data-asistente-mensaje]");
-  let peticion = 0; // si se cierra el panel mientras Gemini responde, esa respuesta se ignora
+  let peticion = 0; // si se cierra el menú mientras Gemini responde, esa respuesta se ignora
 
   function mostrarMensaje(contenido, error = false) {
     mensaje.textContent = contenido || "";
@@ -29,31 +27,11 @@
     completar.disabled = si;
   }
 
-  const abierto = () => !panel.hidden;
-
-  function abrir() {
-    panel.hidden = false;
-    boton.setAttribute("aria-expanded", "true");
-    texto.focus();
-  }
-
-  function cerrar({ devolverFoco = false } = {}) {
-    if (!abierto()) return;
+  raiz.addEventListener("desplegable:abierto", () => texto.focus());
+  raiz.addEventListener("desplegable:cerrado", () => {
     peticion += 1;
     ocupar(false);
     mostrarMensaje(null);
-    panel.hidden = true;
-    boton.setAttribute("aria-expanded", "false");
-    if (devolverFoco) boton.focus();
-  }
-
-  boton.addEventListener("click", () => (abierto() ? cerrar() : abrir()));
-
-  document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape" && abierto()) cerrar({ devolverFoco: true });
-  });
-  document.addEventListener("pointerdown", (event) => {
-    if (abierto() && !raiz.contains(event.target)) cerrar();
   });
 
   for (const ejemplo of raiz.querySelectorAll("[data-ejemplo]")) {
@@ -91,13 +69,8 @@
       texto.focus();
       return;
     }
-    cerrar();
+    raiz.desplegable.cerrar();
     texto.value = "";
     dialogo.abrirConSugerencia(frase, sugerencia);
-  });
-
-  // Al volver con Atrás (bfcache) el panel queda cerrado y listo.
-  window.addEventListener("pageshow", (event) => {
-    if (event.persisted) cerrar();
   });
 })();
