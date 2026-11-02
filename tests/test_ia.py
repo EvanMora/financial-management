@@ -150,3 +150,72 @@ def test_el_menu_del_asistente_aparece_en_el_resumen_solo_con_clave(monkeypatch)
     monkeypatch.delenv("GEMINI_API_KEY")
     html = client.get("/resumen").text
     assert "data-asistente-abrir" not in html and "js/asistente.js" not in html
+
+
+# ---------- Límite de consultas por usuario ----------
+
+@pytest.fixture
+def reloj(monkeypatch):
+    """Reloj falso: los tests avanzan el tiempo sin esperar."""
+    ahora = [1000.0]
+    monkeypatch.setattr(ia, "_reloj", lambda: ahora[0])
+    return ahora
+
+
+def test_pasado_el_limite_por_minuto_responde_429_sin_llamar_a_gemini(monkeypatch, reloj):
+    prompts = gemini_responde(monkeypatch)
+    for _ in range(ia.LIMITE_POR_MINUTO):
+        assert client.post(URL, json={"texto": "taxi"}).status_code == 200
+        reloj[0] += 1
+
+    r = client.post(URL, json={"texto": "taxi"})
+
+    assert r.status_code == 429
+    # La primera consulta fue hace 10 s: falta 50 s para que salga de la ventana de un minuto.
+    assert r.headers["Retry-After"] == "50"
+    assert r.json()["errores"]["general"] == "Hiciste muchas consultas seguidas. Espera 50 s e inténtalo de nuevo."
+    assert len(prompts) == ia.LIMITE_POR_MINUTO
+
+
+def test_al_pasar_el_minuto_se_puede_volver_a_consultar(monkeypatch, reloj):
+    gemini_responde(monkeypatch)
+    for _ in range(ia.LIMITE_POR_MINUTO):
+        client.post(URL, json={"texto": "taxi"})
+    assert client.post(URL, json={"texto": "taxi"}).status_code == 429
+
+    reloj[0] += 60
+
+    assert client.post(URL, json={"texto": "taxi"}).status_code == 200
+
+
+def test_limite_por_dia(monkeypatch, reloj):
+    gemini_responde(monkeypatch)
+    for _ in range(ia.LIMITE_POR_DIA):
+        assert client.post(URL, json={"texto": "taxi"}).status_code == 200
+        reloj[0] += 61  # nunca choca con el límite por minuto
+
+    r = client.post(URL, json={"texto": "taxi"})
+
+    assert r.status_code == 429
+    assert "por hoy" in r.json()["errores"]["general"]
+
+    reloj[0] += 24 * 60 * 60
+    assert client.post(URL, json={"texto": "taxi"}).status_code == 200
+
+
+def test_las_consultas_rechazadas_antes_de_gemini_no_cuentan(monkeypatch, reloj):
+    gemini_responde(monkeypatch)
+    for _ in range(ia.LIMITE_POR_MINUTO + 5):
+        client.post(URL, json={"texto": ""})  # 422: ni siquiera llega al servicio
+
+    assert client.post(URL, json={"texto": "taxi"}).status_code == 200
+
+
+def test_el_limite_es_por_usuario(monkeypatch, reloj):
+    gemini_responde(monkeypatch)
+    for _ in range(ia.LIMITE_POR_MINUTO):
+        ia.interpretar(1, "taxi")
+
+    with pytest.raises(ia.LimiteExcedido):
+        ia.interpretar(1, "taxi")
+    assert ia.interpretar(2, "taxi").monto == 45000
