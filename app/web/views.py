@@ -51,7 +51,7 @@ def _grupos_cuentas(usuario_id: int) -> list[tuple[str, list]]:
 
 
 def _contexto_app(request: Request, seccion: str) -> dict:
-    cuentas, categorias = movimientos_servicio.catalogo(USUARIO_DEMO["id"])
+    _, categorias = movimientos_servicio.catalogo(USUARIO_DEMO["id"])
     return {
         "seccion": seccion,
         "secciones": SECCIONES,
@@ -59,7 +59,6 @@ def _contexto_app(request: Request, seccion: str) -> dict:
         "usuario": USUARIO_DEMO,
         "barra_contraida": request.cookies.get(COOKIE_BARRA) == "1",
         # Para el diálogo "Nuevo movimiento", que está en todas las secciones.
-        "catalogo_cuentas": cuentas,
         "grupos_cuentas": _grupos_cuentas(USUARIO_DEMO["id"]),
         "catalogo_categorias": categorias,
         "hoy_iso": movimientos_servicio.hoy().isoformat(),
@@ -69,15 +68,16 @@ def _contexto_app(request: Request, seccion: str) -> dict:
 
 
 def _periodo(anio: int | None, mes: int | None) -> tuple[int, int]:
-    """Mes pedido, o el actual si no se pide ninguno. No deja ir a meses futuros."""
-    hoy = date.today()
+    """Mes pedido, o el actual si no se pide ninguno. No deja ir a meses futuros. Usa la fecha de
+    la app (movimientos.hoy), como el resto de las cuentas."""
+    hoy = movimientos_servicio.hoy()
     if anio is None or mes is None:
         return hoy.year, hoy.month
     return min((anio, mes), (hoy.year, hoy.month))
 
 
 def _navegacion_mes(anio: int, mes: int) -> dict:
-    hoy = date.today()
+    hoy = movimientos_servicio.hoy()
     anterior = (anio - 1, 12) if mes == 1 else (anio, mes - 1)
     siguiente = (anio + 1, 1) if mes == 12 else (anio, mes + 1)
     return {
@@ -108,11 +108,6 @@ def resumen(
         "periodo": _navegacion_mes(anio, mes),
     }
     return templates.TemplateResponse(request, "app/resumen.html", context)
-
-
-def _seccion_pendiente(request: Request, seccion: str, nombre: str, texto: str):
-    context = _contexto_app(request, seccion) | {"titulo": nombre, "texto": texto}
-    return templates.TemplateResponse(request, "app/pendiente.html", context)
 
 
 def _entero(valor: str | None) -> int | None:
@@ -159,14 +154,13 @@ def movimientos(
     filtros = _filtros(tipo, cuenta, categoria, q)
     lista = movimientos_servicio.listar(USUARIO_DEMO["id"], anio, mes, filtros)
     pagos = cuentas_servicio.pagos_del_mes(USUARIO_DEMO["id"], anio, mes, filtros)
-    cuentas, categorias = movimientos_servicio.catalogo(USUARIO_DEMO["id"])
+    _, categorias = movimientos_servicio.catalogo(USUARIO_DEMO["id"])
     context = _contexto_app(request, "movimientos") | {
         "lista": lista,
         "vista": vista_movimientos(lista, pagos),
         "pago": datos_pago(cuentas_servicio.panel(USUARIO_DEMO["id"])),
         "periodo": _navegacion_mes(anio, mes),
         "consulta": _consulta(filtros),
-        "cuentas": cuentas,
         "categorias": categorias,
         "abrir_dialogo": nuevo == "1",
         "guardado": _entero(guardado),

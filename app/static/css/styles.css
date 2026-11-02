@@ -33,6 +33,12 @@ html {
   -webkit-text-size-adjust: 100%;
 }
 
+/* El atributo hidden siempre oculta. Sin esto, cualquier clase que ponga display (.field,
+   .dialog__pair, .btn...) lo anula y la parte "oculta" se ve igual. */
+[hidden] {
+  display: none !important;
+}
+
 body {
   margin: 0;
   background: var(--color-surface);

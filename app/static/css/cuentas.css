@@ -35,10 +35,6 @@
   stroke-linejoin: round;
 }
 
-.cuenta-icono [hidden] {
-  display: none;
-}
-
 /* Los .tono-* están en app.css: también los usan las filas de pago de Movimientos. */
 
 /* ---------- Totales ---------- */
@@ -181,12 +177,6 @@
 }
 
 /* ---------- Diálogo ---------- */
-/* Los campos de un solo grupo se ocultan con [hidden]; .field y .dialog__pair ponen display. */
-.dialog [data-solo-dinero][hidden],
-.dialog [data-solo-tarjeta][hidden] {
-  display: none;
-}
-
 .cuenta-nombre-fila {
   display: flex;
   align-items: flex-start;

@@ -30,8 +30,11 @@ def test_login_static_assets_are_served():
         assert client.get(path).status_code == 200, path
 
 
-def test_home_still_returns_json():
-    assert client.get("/").json() == {"mensaje": "Hola bibliopedia"}
+def test_la_raiz_lleva_al_resumen():
+    r = client.get("/", follow_redirects=False)
+
+    assert r.status_code == 307
+    assert r.headers["location"] == "/resumen"
 
 
 def test_preview_numbers_are_consistent():

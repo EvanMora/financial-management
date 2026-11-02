@@ -116,3 +116,15 @@ def test_scripts_del_dialogo():
     assert "js/movimientos.js" in client.get("/movimientos").text
     for path in ("/static/js/movimiento-dialogo.js", "/static/js/movimientos.js"):
         assert client.get(path).status_code == 200, path
+
+
+def test_la_navegacion_de_meses_usa_la_fecha_de_la_app(monkeypatch):
+    """El selector de mes y el tope de meses futuros usan movimientos.hoy(), como el resto de la
+    app, no la fecha del sistema (así las pruebas con fecha fija no dependen del mes real)."""
+    monkeypatch.setattr(movimientos, "hoy", lambda: date(2027, 3, 10))
+
+    html = client.get("/resumen?anio=2030&mes=1").text
+
+    assert "Marzo 2027" in html
+    assert "month__off" in html  # no hay mes siguiente
+    assert 'href="/resumen?anio=2027&amp;mes=2"' in html
