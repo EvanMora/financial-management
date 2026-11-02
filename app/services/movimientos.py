@@ -8,7 +8,6 @@ días que ya pasaron.
 TODO(backend): reemplazar el almacén por consultas filtradas por usuario_id. Las firmas, los
 modelos de app/schemas/movimientos.py y las reglas de _validar() se mantienen.
 """
-import unicodedata
 from datetime import date
 from decimal import Decimal
 
@@ -20,24 +19,18 @@ from app.schemas.movimientos import (
     Movimiento,
     MovimientoEntrada,
 )
+from app.services import categorias
+from app.services.comun import ErrorValidacion, NoEncontrado  # la API los toma de aquí: servicio.ErrorValidacion
+from app.services.comun import normalizar as _normalizar
 
 MAX_DESCRIPCION = 80
 # Tope del monto: 12 dígitos enteros, los mismos que acepta el campo del diálogo. Sin tope, un
 # monto como 1E+30 no cabe en la precisión de Decimal y rompe el formato de toda la pantalla.
 MAX_MONTO = Decimal("1000000000000")
 
-# TODO(backend): cuentas y categorías del usuario (las categorías por defecto tienen usuario_id null).
+# TODO(backend): cuentas del usuario. Las categorías salen de services/categorias.py.
 _CUENTAS = [CuentaRef(id=1, nombre="Cuenta de ahorros"), CuentaRef(id=2, nombre="Billetera digital"),
             CuentaRef(id=3, nombre="Efectivo")]
-_CATEGORIAS = [
-    CategoriaRef(id=1, nombre="Salario", tipo="ingreso"),
-    CategoriaRef(id=2, nombre="Otros ingresos", tipo="ingreso"),
-    CategoriaRef(id=3, nombre="Mercado", tipo="gasto"),
-    CategoriaRef(id=4, nombre="Transporte", tipo="gasto"),
-    CategoriaRef(id=5, nombre="Arriendo", tipo="gasto"),
-    CategoriaRef(id=6, nombre="Ocio", tipo="gasto"),
-    CategoriaRef(id=7, nombre="Otros gastos", tipo="gasto"),
-]
 
 # Plantilla de cada mes: (día, descripción, categoría, cuenta, tipo, monto).
 _PLANTILLA = [
@@ -54,16 +47,6 @@ _PLANTILLA = [
 _movimientos: dict[int, Movimiento] = {}
 _meses_sembrados: set[tuple[int, int]] = set()
 _siguiente_id = 1
-
-
-class ErrorValidacion(Exception):
-    def __init__(self, errores: dict[str, str]):
-        super().__init__(errores)
-        self.errores = errores
-
-
-class NoEncontrado(Exception):
-    pass
 
 
 def hoy() -> date:
@@ -89,8 +72,8 @@ def _ultimo_dia(anio: int, mes: int) -> int:
     return (siguiente - date(anio, mes, 1)).days
 
 
-def _por_nombre(lista, nombre):
-    return next(x for x in lista if x.nombre == nombre)
+def _cuenta(nombre: str) -> CuentaRef:
+    return next(c for c in _CUENTAS if c.nombre == nombre)
 
 
 def _sembrar(anio: int, mes: int) -> None:
@@ -105,14 +88,9 @@ def _sembrar(anio: int, mes: int) -> None:
         if fecha > limite:
             continue
         nuevo = Movimiento(id=_nuevo_id(), fecha=fecha, descripcion=descripcion,
-                           categoria=_por_nombre(_CATEGORIAS, categoria),
-                           cuenta=_por_nombre(_CUENTAS, cuenta), tipo=tipo, monto=Decimal(monto))
+                           categoria=categorias.ref(categorias.predeterminada(categoria)),
+                           cuenta=_cuenta(cuenta), tipo=tipo, monto=Decimal(monto))
         _movimientos[nuevo.id] = nuevo
-
-
-def _normalizar(texto: str) -> str:
-    sin_tildes = unicodedata.normalize("NFKD", texto)
-    return "".join(c for c in sin_tildes if not unicodedata.combining(c)).casefold()
 
 
 def _coincide(m: Movimiento, f: FiltrosMovimientos, buscar: str) -> bool:
@@ -128,8 +106,26 @@ def _coincide(m: Movimiento, f: FiltrosMovimientos, buscar: str) -> bool:
 
 
 def catalogo(usuario_id: int) -> tuple[list[CuentaRef], list[CategoriaRef]]:
-    # TODO(backend): cuentas y categorías de usuario_id.
-    return list(_CUENTAS), list(_CATEGORIAS)
+    # TODO(backend): cuentas de usuario_id.
+    return list(_CUENTAS), [categorias.ref(c) for c in categorias.listar(usuario_id)]
+
+
+def usos_por_categoria(usuario_id: int) -> dict[int, int]:
+    """Cuántos movimientos tiene cada categoría, contando todos los meses."""
+    # TODO(backend): SELECT categoria_id, COUNT(*) ... GROUP BY categoria_id.
+    usos: dict[int, int] = {}
+    for m in _movimientos.values():
+        usos[m.categoria.id] = usos.get(m.categoria.id, 0) + 1
+    return usos
+
+
+def cambiar_categoria(usuario_id: int, de_id: int, a: CategoriaRef) -> None:
+    """Pone la categoría "a" en los movimientos de la categoría de_id. Sirve para renombrar
+    (de_id == a.id) y para pasar los movimientos de una categoría que se va a eliminar."""
+    # TODO(backend): con la tabla de movimientos no hace falta al renombrar; al eliminar es un UPDATE.
+    for id, m in _movimientos.items():
+        if m.categoria.id == de_id:
+            _movimientos[id] = m.model_copy(update={"categoria": a})
 
 
 def listar(usuario_id: int, anio: int, mes: int, filtros: FiltrosMovimientos | None = None) -> ListaMovimientos:
@@ -163,13 +159,14 @@ def _normalizar_monto(monto: Decimal) -> Decimal:
     return monto.quantize(Decimal(1)) if monto == monto.to_integral_value() else monto.quantize(Decimal("0.01"))
 
 
-def _validar(entrada: MovimientoEntrada) -> tuple[CategoriaRef, CuentaRef, str]:
+def _validar(usuario_id: int, entrada: MovimientoEntrada) -> tuple[CategoriaRef, CuentaRef, str]:
     errores: dict[str, str] = {}
     if not entrada.monto.is_finite() or entrada.monto <= 0:
         errores["monto"] = "Escribe un monto mayor que 0."
     elif entrada.monto >= MAX_MONTO:
         errores["monto"] = "El monto es demasiado grande."
-    categoria = next((c for c in _CATEGORIAS if c.id == entrada.categoria_id), None)
+    encontrada = categorias.obtener(usuario_id, entrada.categoria_id)
+    categoria = categorias.ref(encontrada) if encontrada else None
     if categoria is None:
         errores["categoria_id"] = "Elige una categoría."
     elif categoria.tipo != entrada.tipo:
@@ -187,8 +184,8 @@ def _validar(entrada: MovimientoEntrada) -> tuple[CategoriaRef, CuentaRef, str]:
     return categoria, cuenta, descripcion
 
 
-def _guardar(id: int, entrada: MovimientoEntrada) -> Movimiento:
-    categoria, cuenta, descripcion = _validar(entrada)
+def _guardar(usuario_id: int, id: int, entrada: MovimientoEntrada) -> Movimiento:
+    categoria, cuenta, descripcion = _validar(usuario_id, entrada)
     # Sembrar el mes de destino antes de guardar, para que una siembra posterior no lo pise.
     _sembrar(entrada.fecha.year, entrada.fecha.month)
     movimiento = Movimiento(id=id, fecha=entrada.fecha, descripcion=descripcion, categoria=categoria,
@@ -199,16 +196,16 @@ def _guardar(id: int, entrada: MovimientoEntrada) -> Movimiento:
 
 def crear(usuario_id: int, entrada: MovimientoEntrada) -> Movimiento:
     # TODO(backend): INSERT con usuario_id.
-    _validar(entrada)
+    _validar(usuario_id, entrada)
     _sembrar(entrada.fecha.year, entrada.fecha.month)  # antes del id, para que el nuevo sea el mayor
-    return _guardar(_nuevo_id(), entrada)
+    return _guardar(usuario_id, _nuevo_id(), entrada)
 
 
 def actualizar(usuario_id: int, id: int, entrada: MovimientoEntrada) -> Movimiento:
     # TODO(backend): UPDATE por id y usuario_id.
     if id not in _movimientos:
         raise NoEncontrado(id)
-    return _guardar(id, entrada)
+    return _guardar(usuario_id, id, entrada)
 
 
 def eliminar(usuario_id: int, id: int) -> None:

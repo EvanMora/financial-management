@@ -88,6 +88,8 @@
 </div>
 
 {% include "app/_dialogo_movimiento.html" %}
+{# Diálogos propios de una sección. Van fuera de .view para no heredar su animación de entrada. #}
+{% block dialogos %}{% endblock %}
 <div class="toast" role="status" aria-live="polite" data-toast hidden></div>
 {% endblock %}
 
