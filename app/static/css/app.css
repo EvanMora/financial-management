@@ -765,6 +765,76 @@
   font-weight: var(--weight-semibold);
 }
 
+/* Asistente con Gemini: bloque gris claro arriba del formulario, solo al crear. */
+.dialog__ia {
+  display: grid;
+  gap: var(--space-8);
+  padding: var(--space-16);
+  background: var(--color-canvas);
+  border-radius: var(--radius-inner);
+}
+
+.dialog__ia[hidden] {
+  display: none;
+}
+
+.ia-fila {
+  display: flex;
+  gap: var(--space-8);
+}
+
+.ia-input {
+  flex: 1;
+  min-width: 0;
+  height: 40px;
+  padding: 0 var(--space-16);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--text-small);
+  letter-spacing: var(--tracking-small);
+  transition: border-color var(--duration-default) var(--ease-out), box-shadow var(--duration-default) var(--ease-out);
+}
+
+.ia-input:hover {
+  border-color: var(--color-text);
+}
+
+.ia-input:focus-visible {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: var(--focus-ring);
+}
+
+.ia-boton {
+  flex: none;
+  height: 40px;
+  padding: 0 var(--space-16);
+  font-size: var(--text-small);
+  letter-spacing: var(--tracking-small);
+}
+
+.ia-boton.is-loading {
+  background: var(--color-text);
+}
+
+.ia-boton.is-loading .ia-icono {
+  display: none;
+}
+
+.ia-icono {
+  width: 14px;
+  height: 14px;
+  fill: currentColor;
+}
+
+.dialog__ia .field__message:not(.field__message--error),
+.asistente__panel .field__message:not(.field__message--error) {
+  color: var(--color-text-secondary);
+}
+
 .dialog__pair {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -814,6 +884,237 @@
   outline: none;
   border-radius: var(--radius-small);
   box-shadow: 0 0 0 3px rgba(215, 0, 21, 0.25);
+}
+
+/* ---------- Asistente de la barra superior ----------
+ * Botón píldora como el selector de mes. El panel es opaco (superficie de menús) con el filo del
+ * vidrio y sin sombra: lleva un campo de texto y tiene que leerse sobre cualquier contenido.
+ */
+.asistente {
+  position: relative;
+}
+
+.asistente__boton {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 12px 0 14px;
+  border: 0;
+  background: var(--color-surface);
+  border-radius: var(--radius-pill);
+  box-shadow: inset 0 0 0 1px var(--color-border-strong);
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--text-small);
+  font-weight: var(--weight-medium);
+  letter-spacing: var(--tracking-small);
+  cursor: pointer;
+  transition: box-shadow var(--duration-fast) var(--ease-out);
+}
+
+.asistente__boton:hover,
+.asistente__boton[aria-expanded="true"] {
+  box-shadow: inset 0 0 0 1px var(--color-text);
+}
+
+.asistente__boton:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 1px var(--color-border-strong), var(--focus-ring);
+}
+
+.asistente__flecha {
+  width: 12px;
+  height: 12px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: transform var(--duration-default) var(--ease-out);
+}
+
+.asistente__boton[aria-expanded="true"] .asistente__flecha {
+  transform: rotate(180deg);
+}
+
+.asistente__panel {
+  position: absolute;
+  top: calc(100% + var(--space-8));
+  right: 0;
+  z-index: 20;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-12);
+  width: min(380px, calc(100vw - 32px));
+  padding: var(--space-20);
+  background: var(--color-surface-raised);
+  border-radius: var(--radius-inner);
+  box-shadow: var(--glass-edge), 0 0 0 1px var(--color-fill-muted);
+  animation: asistente-in var(--duration-default) var(--ease-emphasized);
+}
+
+.asistente__panel[hidden] {
+  display: none;
+}
+
+@keyframes asistente-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+
+.asistente__titulo {
+  font-weight: var(--weight-semibold);
+}
+
+.asistente__texto {
+  margin-top: 2px;
+  color: var(--color-text-secondary);
+  font-size: var(--text-small);
+  line-height: var(--leading-small);
+  letter-spacing: var(--tracking-small);
+}
+
+.asistente__ejemplos {
+  display: grid;
+  gap: var(--space-8);
+}
+
+.asistente__ejemplos ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.asistente__ejemplo {
+  padding: 5px 12px;
+  border: 0;
+  background: var(--color-surface);
+  border-radius: var(--radius-pill);
+  box-shadow: inset 0 0 0 1px var(--color-border);
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--text-caption);
+  letter-spacing: var(--tracking-caption);
+  cursor: pointer;
+  transition: box-shadow var(--duration-fast) var(--ease-out);
+}
+
+.asistente__ejemplo:hover {
+  box-shadow: inset 0 0 0 1px var(--color-text);
+}
+
+.asistente__ejemplo:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 1px var(--color-border), var(--focus-ring);
+}
+
+/* Análisis del mes (Resumen): observaciones con viñeta, consejo en un bloque y nota de privacidad. */
+.analisis__cuerpo {
+  display: grid;
+  gap: var(--space-12);
+}
+
+.analisis__cuerpo:empty {
+  display: none;
+}
+
+.analisis__lista {
+  display: grid;
+  gap: var(--space-8);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-small);
+  line-height: var(--leading-small);
+  letter-spacing: var(--tracking-small);
+}
+
+.analisis__lista li {
+  position: relative;
+  padding-left: var(--space-16);
+}
+
+.analisis__lista li::before {
+  content: "";
+  position: absolute;
+  top: 0.5em;
+  left: 2px;
+  width: 6px;
+  height: 6px;
+  background: var(--color-text);
+  border-radius: 50%;
+}
+
+.analisis__consejo {
+  display: grid;
+  gap: 2px;
+  padding: var(--space-12) var(--space-16);
+  background: var(--color-canvas);
+  border-radius: var(--radius-small);
+  font-size: var(--text-small);
+  line-height: var(--leading-small);
+  letter-spacing: var(--tracking-small);
+}
+
+.analisis__consejo strong {
+  font-size: var(--text-caption);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-caption);
+}
+
+.analisis__reintentar {
+  justify-self: start;
+}
+
+.analisis__nota {
+  display: flex;
+  gap: 6px;
+  align-items: flex-start;
+  padding-top: var(--space-12);
+  border-top: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--leading-caption);
+  letter-spacing: var(--tracking-caption);
+}
+
+.analisis__nota .ia-icono {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  margin-top: 2px;
+}
+
+.analisis__esqueleto {
+  display: grid;
+  gap: var(--space-8);
+}
+
+.analisis__esqueleto span {
+  height: 12px;
+  background: var(--color-fill-muted);
+  border-radius: var(--radius-pill);
+  animation: esqueleto 900ms var(--ease-out) infinite alternate;
+}
+
+.analisis__esqueleto span:nth-child(2) {
+  width: 85%;
+}
+
+.analisis__esqueleto span:nth-child(3) {
+  width: 60%;
+}
+
+@keyframes esqueleto {
+  to {
+    opacity: 0.45;
+  }
 }
 
 /* ---------- Aviso ("Movimiento guardado") ----------
@@ -948,6 +1249,26 @@
   .dialog__pair {
     grid-template-columns: minmax(0, 1fr);
   }
+
+  /* En el celular el botón queda solo con el ícono y el panel ocupa el ancho de la pantalla. */
+  .asistente__etiqueta,
+  .asistente__flecha {
+    display: none;
+  }
+
+  .asistente__boton {
+    width: 36px;
+    padding: 0;
+    justify-content: center;
+  }
+
+  .asistente__panel {
+    position: fixed;
+    top: 68px;
+    right: var(--space-16);
+    left: var(--space-16);
+    width: auto;
+  }
 }
 
 /* ---------- Movimiento reducido: todo cambia al instante ---------- */
@@ -962,6 +1283,7 @@
   .dialog,
   .dialog::backdrop,
   .dialog *,
+  .asistente *,
   .toast {
     animation: none !important;
     transition: none !important;

@@ -4,6 +4,9 @@
  *   de Movimientos con window.dialogoMovimiento.abrir(movimiento).
  * - Guarda con la API JSON (/api/v1/movimientos) y muestra los errores por campo, como el login.
  * - Después de guardar o eliminar recarga la sección y deja un aviso para la página siguiente.
+ * - Si hay asistente (GEMINI_API_KEY), al crear se puede escribir una frase y "Completar" llena el
+ *   formulario con la sugerencia de /api/v1/ia/interpretar-movimiento. El usuario revisa y guarda.
+ *   El asistente de la barra superior (asistente.js) usa interpretar() y abrirConSugerencia().
  */
 (() => {
   const dialog = document.querySelector("[data-dialogo-movimiento]");
@@ -126,6 +129,7 @@
     campos.cuenta_id.value = movimiento?.cuenta_id ?? "";
     campos.fecha.value = movimiento?.fecha ?? hoy;
     campos.descripcion.value = movimiento?.descripcion ?? "";
+    reiniciarIA(Boolean(movimiento));
 
     // En el celular, si el cajón de la barra estaba abierto, se cierra.
     document.querySelector("[data-shell].is-open [data-scrim]")?.click();
@@ -161,6 +165,115 @@
     enlace.addEventListener("click", (event) => {
       event.preventDefault();
       abrir(null);
+    });
+  }
+
+  // ---------- Asistente con Gemini: frase → formulario ----------
+  const ia = form.querySelector("[data-ia]");
+  const iaTexto = ia?.querySelector("[data-ia-texto]");
+  const iaBoton = ia?.querySelector("[data-ia-completar]");
+  const iaMensaje = ia?.querySelector("[data-ia-mensaje]");
+  let iaPeticion = 0; // las respuestas de una petición vieja (diálogo cerrado y reabierto) se ignoran
+
+  function mensajeIA(texto, error = false) {
+    if (!ia) return;
+    iaMensaje.textContent = texto || "";
+    iaMensaje.hidden = !texto;
+    iaMensaje.classList.toggle("field__message--error", error);
+    if (error) iaTexto.setAttribute("aria-invalid", "true");
+    else iaTexto.removeAttribute("aria-invalid");
+  }
+
+  function ocuparIA(si) {
+    iaBoton.classList.toggle("is-loading", si);
+    iaBoton.disabled = si;
+  }
+
+  function reiniciarIA(editando) {
+    if (!ia) return;
+    iaPeticion += 1;
+    ia.hidden = editando; // solo al crear
+    iaTexto.value = "";
+    ocuparIA(false);
+    mensajeIA(null);
+  }
+
+  function aplicarSugerencia(s) {
+    form.elements.tipo.value = s.tipo;
+    filtrarCategorias();
+    if (s.monto != null) campos.monto.value = miles(digitosMonto(s.monto));
+    if (s.categoria_id != null) campos.categoria_id.value = String(s.categoria_id);
+    if (s.cuenta_id != null) campos.cuenta_id.value = String(s.cuenta_id);
+    if (s.fecha) campos.fecha.value = s.fecha;
+    if (s.descripcion) campos.descripcion.value = s.descripcion;
+    limpiarErrores();
+
+    const faltan = [
+      ["monto", "el monto"],
+      ["categoria_id", "la categoría"],
+      ["cuenta_id", "la cuenta"],
+    ].filter(([nombre]) => !campos[nombre].value);
+    if (faltan.length) {
+      mensajeIA(`Revisa los datos y completa ${faltan.map(([, texto]) => texto).join(", ")}.`);
+      campos[faltan[0][0]].focus();
+    } else {
+      mensajeIA("Listo. Revisa los datos y guarda.");
+      guardar.focus();
+    }
+  }
+
+  // Frase → { sugerencia } o { error } (mensaje para el usuario). No toca el formulario.
+  async function interpretar(texto) {
+    try {
+      const respuesta = await pedir("/api/v1/ia/interpretar-movimiento", {
+        method: "POST",
+        body: JSON.stringify({ texto }),
+      });
+      const datos = await respuesta.json().catch(() => ({}));
+      if (respuesta.ok) return { sugerencia: datos };
+      const errores = datos.errores ?? {};
+      return { error: errores.texto ?? errores.general ?? "El asistente no respondió. Llena el formulario o inténtalo de nuevo." };
+    } catch {
+      return { error: "No se pudo contactar al asistente. Revisa tu conexión." };
+    }
+  }
+
+  // Abre "Nuevo movimiento" ya lleno con una sugerencia que se pidió desde otro lado.
+  function abrirConSugerencia(texto, sugerencia) {
+    abrir(null);
+    if (ia) iaTexto.value = texto;
+    aplicarSugerencia(sugerencia);
+  }
+
+  async function completarConIA() {
+    if (!ia || iaBoton.disabled) return;
+    const texto = iaTexto.value.trim();
+    if (!texto) {
+      mensajeIA("Escribe qué gastaste o recibiste.", true);
+      iaTexto.focus();
+      return;
+    }
+    const peticion = ++iaPeticion;
+    mensajeIA(null);
+    ocuparIA(true);
+    const { sugerencia, error } = await interpretar(texto);
+    if (peticion !== iaPeticion) return;
+    ocuparIA(false);
+    if (sugerencia) aplicarSugerencia(sugerencia);
+    else mensajeIA(error, true);
+  }
+
+  if (ia) {
+    iaBoton.addEventListener("click", completarConIA);
+    // Enter en la frase completa el formulario; no lo envía.
+    iaTexto.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" && !event.isComposing) {
+        event.preventDefault();
+        completarConIA();
+      }
+    });
+    iaTexto.addEventListener("input", () => {
+      if (iaTexto.hasAttribute("aria-invalid")) mensajeIA(null);
     });
   }
 
@@ -302,5 +415,5 @@
     if (dialog.open) dialog.close();
   });
 
-  window.dialogoMovimiento = { abrir };
+  window.dialogoMovimiento = { abrir, interpretar, abrirConSugerencia };
 })();

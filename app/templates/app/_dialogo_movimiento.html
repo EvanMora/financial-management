@@ -15,6 +15,23 @@
 
     <div class="alert alert--danger" role="alert" data-form-alert hidden></div>
 
+    {% if ia_disponible %}
+    {# Asistente con Gemini: una frase completa el formulario (solo al crear; ver services/ia.py). #}
+    <div class="dialog__ia" data-ia>
+      <label class="field__label" for="mov-ia">Escríbelo con tus palabras</label>
+      <div class="ia-fila">
+        <input class="ia-input" id="mov-ia" type="text" maxlength="300" autocomplete="off"
+               placeholder="Ej.: ayer 45.000 en taxi" aria-describedby="ia-mensaje" data-ia-texto>
+        <button class="btn btn--ink ia-boton" type="button" data-ia-completar>
+          <span class="spinner" aria-hidden="true"></span>
+          <svg class="ia-icono" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5l1.6 4.9 4.9 1.6-4.9 1.6L8 14.5l-1.6-4.9L1.5 8l4.9-1.6z"/></svg>
+          <span>Completar</span>
+        </button>
+      </div>
+      <p class="field__message" id="ia-mensaje" role="status" data-ia-mensaje hidden></p>
+    </div>
+    {% endif %}
+
     <fieldset class="segmented dialog__tipo">
       <legend class="visually-hidden">Tipo</legend>
       <label class="segmented__option">
