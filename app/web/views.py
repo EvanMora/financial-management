@@ -10,11 +10,12 @@ from fastapi.templating import Jinja2Templates
 
 from app.schemas.movimientos import FiltrosMovimientos
 from app.services import categorias as categorias_servicio
+from app.services import cuentas as cuentas_servicio
 from app.services import ia as ia_servicio
 from app.services import movimientos as movimientos_servicio
 from app.services.dashboard import obtener_resumen
 from app.web import formato
-from app.web.presentacion import vista_categorias, vista_movimientos, vista_resumen
+from app.web.presentacion import datos_pago, vista_categorias, vista_cuentas, vista_movimientos, vista_resumen
 from app.web.preview import build_preview
 from app.web.sesion import USUARIO_DEMO
 
@@ -41,6 +42,14 @@ PROXIMAMENTE = [("Presupuestos", "presupuestos"), ("Metas", "metas")]
 
 
 
+def _grupos_cuentas(usuario_id: int) -> list[tuple[str, list]]:
+    """Las cuentas para los <select>, en <optgroup> "Dinero" y "Tarjetas" (sin grupos vacíos)."""
+    lista = cuentas_servicio.listar(usuario_id)
+    grupos = [("Dinero", [cuentas_servicio.ref(c) for c in lista if not cuentas_servicio.es_tarjeta(c.tipo)]),
+              ("Tarjetas", [cuentas_servicio.ref(c) for c in lista if cuentas_servicio.es_tarjeta(c.tipo)])]
+    return [(nombre, refs) for nombre, refs in grupos if refs]
+
+
 def _contexto_app(request: Request, seccion: str) -> dict:
     cuentas, categorias = movimientos_servicio.catalogo(USUARIO_DEMO["id"])
     return {
@@ -51,6 +60,7 @@ def _contexto_app(request: Request, seccion: str) -> dict:
         "barra_contraida": request.cookies.get(COOKIE_BARRA) == "1",
         # Para el diálogo "Nuevo movimiento", que está en todas las secciones.
         "catalogo_cuentas": cuentas,
+        "grupos_cuentas": _grupos_cuentas(USUARIO_DEMO["id"]),
         "catalogo_categorias": categorias,
         "hoy_iso": movimientos_servicio.hoy().isoformat(),
         # El asistente con Gemini solo aparece si hay GEMINI_API_KEY.
@@ -163,9 +173,15 @@ def movimientos(
 
 
 @router.get("/cuentas", response_class=HTMLResponse)
-def cuentas(request: Request):
-    return _seccion_pendiente(request, "cuentas", "Cuentas",
-                              "Aquí vas a ver el saldo de cada cuenta: banco, billetera digital y efectivo.")
+def cuentas(request: Request, guardado: str | None = None):
+    panel = cuentas_servicio.panel(USUARIO_DEMO["id"])
+    context = _contexto_app(request, "cuentas") | {
+        "panel": panel,
+        "vista": vista_cuentas(panel),
+        "pago": datos_pago(panel),
+        "guardado": _entero(guardado),
+    }
+    return templates.TemplateResponse(request, "app/cuentas.html", context)
 
 
 @router.get("/categorias", response_class=HTMLResponse)
