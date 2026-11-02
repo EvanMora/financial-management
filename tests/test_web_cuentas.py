@@ -104,7 +104,7 @@ def test_datos_para_editar():
     ahorros = next(d for d in datos if d["id"] == 1)
     assert {k: v for k, v in ahorros.items() if k != "usos"} == {
         "id": 1, "nombre": "Cuenta de ahorros", "tipo": "ahorros", "icono": "banco", "tono": "azul",
-        "saldo": "3612400", "cupo": None, "dia_pago": None}
+        "saldo": "3612400", "cupo": None, "dia_pago": None, "pagos": 0}
     assert ahorros["usos"] > 0
     tarjeta = next(d for d in datos if d["id"] == 4)
     assert (tarjeta["saldo"], tarjeta["cupo"], tarjeta["dia_pago"]) == ("840000", "3000000", 15)

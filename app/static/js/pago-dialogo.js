@@ -35,19 +35,28 @@
   let tarjeta = null; // { id, nombre, deuda, fecha_texto }
   let actual = null;  // pago en edición { id, monto, cuenta_origen_id, fecha }, o null
   let ocupado = false;
+  // Monto exacto (con centavos) cuando el campo se llenó con la deuda completa: el campo solo
+  // muestra pesos enteros, pero "Pagar todo" tiene que dejar la tarjeta en $0. Se borra al escribir.
+  let montoExacto = null;
 
-  // ---------- Montos (enteros en pesos, como el resto de diálogos) ----------
+  // ---------- Montos ----------
+  // El campo muestra pesos enteros con puntos de miles (como el resto de diálogos). Las cuentas se
+  // hacen con el valor exacto de la API ("840000.50") y se muestran redondeadas, como el servidor.
   const miles = (digitos) => digitos.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
   const digitosCampo = (texto) => String(texto).replace(/\D/g, "").replace(/^0+(?=\d)/, "");
-  const entero = (monto) => {
-    const texto = String(monto);
-    const negativo = texto.startsWith("-");
-    const valor = Number(digitosCampo(texto.split(".")[0]) || 0);
-    return negativo ? -valor : valor;
-  };
-  const pesos = (valor) => `${valor < 0 ? "−" : ""}$${miles(String(Math.abs(valor)))}`;
+  const numero = (monto) => Number(monto) || 0;
+  const redondo = (valor) => Math.sign(valor) * Math.round(Math.abs(valor));
+  const pesos = (valor) => `${redondo(valor) < 0 ? "−" : ""}$${miles(String(Math.abs(redondo(valor))))}`;
+  const exacto = (valor) => valor.toFixed(2).replace(/\.00$/, "");
+  const montoActual = () => (montoExacto !== null ? numero(montoExacto) : numero(digitosCampo(campos.monto.value)));
+
+  function llenarMonto(valor) {
+    montoExacto = valor > 0 ? exacto(valor) : null;
+    campos.monto.value = valor > 0 ? miles(String(Math.abs(redondo(valor)))) : "";
+  }
 
   campos.monto.addEventListener("input", () => {
+    montoExacto = null;
     const digitos = digitosCampo(campos.monto.value).slice(0, 12);
     campos.monto.value = digitos ? miles(digitos) : "";
     calcularDespues();
@@ -55,23 +64,23 @@
   campos.cuenta_origen_id.addEventListener("change", calcularDespues);
 
   // Al editar, lo que el pago ya restó vuelve a estar disponible.
-  const deudaMaxima = () => entero(tarjeta.deuda) + (actual ? entero(actual.monto) : 0);
+  const deudaMaxima = () => numero(tarjeta.deuda) + (actual ? numero(actual.monto) : 0);
   function saldoOrigen(id) {
     const cuenta = dinero.find((c) => String(c.id) === String(id));
     if (!cuenta) return null;
-    const devuelto = actual && String(actual.cuenta_origen_id) === String(id) ? entero(actual.monto) : 0;
-    return { nombre: cuenta.nombre, saldo: entero(cuenta.saldo) + devuelto };
+    const devuelto = actual && String(actual.cuenta_origen_id) === String(id) ? numero(actual.monto) : 0;
+    return { nombre: cuenta.nombre, saldo: numero(cuenta.saldo) + devuelto };
   }
 
   function calcularDespues() {
-    const monto = Number(digitosCampo(campos.monto.value) || 0);
+    const monto = montoActual();
     const origen = saldoOrigen(campos.cuenta_origen_id.value);
     if (!monto || !origen) {
       despues.textContent = "";
       return;
     }
     const deuda = deudaMaxima() - monto;
-    despues.textContent = `Después: ${origen.nombre} ${pesos(origen.saldo - monto)} · ${tarjeta.nombre} ${deuda > 0 ? `debe ${pesos(deuda)}` : "queda al día"}`;
+    despues.textContent = `Después: ${origen.nombre} ${pesos(origen.saldo - monto)} · ${tarjeta.nombre} ${deuda > 0.004 ? `debe ${pesos(deuda)}` : "queda al día"}`;
   }
 
   // ---------- Errores ----------
@@ -123,12 +132,12 @@
     titulo.textContent = pago ? "Editar pago" : `Pagar ${tarjeta.nombre}`;
     const max = deudaMaxima();
     detalle.textContent = pago
-      ? `${tarjeta.nombre} · Debe ${pesos(entero(tarjeta.deuda))}`
+      ? `${tarjeta.nombre} · Debe ${pesos(numero(tarjeta.deuda))}`
       : `Debes ${pesos(max)}${tarjeta.fecha_texto !== "Al día" ? ` · ${tarjeta.fecha_texto}` : ""}`;
     textoGuardar.textContent = pago ? "Guardar" : "Registrar pago";
     eliminar.hidden = !pago;
     textoTodo.textContent = pesos(max);
-    campos.monto.value = pago ? miles(String(entero(pago.monto))) : max > 0 ? miles(String(max)) : "";
+    llenarMonto(pago ? numero(pago.monto) : max);
     campos.cuenta_origen_id.value = pago?.cuenta_origen_id ?? "";
     campos.fecha.value = pago?.fecha ?? hoy;
     calcularDespues();
@@ -139,7 +148,7 @@
   }
 
   pagarTodo.addEventListener("click", () => {
-    campos.monto.value = miles(String(deudaMaxima()));
+    llenarMonto(deudaMaxima());
     errorDeCampo("monto", null);
     calcularDespues();
   });
@@ -191,13 +200,13 @@
 
   function validar() {
     const errores = {};
-    const monto = Number(digitosCampo(campos.monto.value) || 0);
+    const monto = montoActual();
     const max = deudaMaxima();
     if (!(monto > 0)) errores.monto = "Escribe un monto mayor que 0.";
-    else if (monto > max) errores.monto = `No puedes pagar más de lo que debes (${pesos(max)}).`;
+    else if (monto > max + 0.004) errores.monto = `No puedes pagar más de lo que debes (${pesos(max)}).`;
     const origen = saldoOrigen(campos.cuenta_origen_id.value);
     if (!origen) errores.cuenta_origen_id = "Elige de qué cuenta sale el pago.";
-    else if (monto > 0 && monto > origen.saldo) errores.cuenta_origen_id = `No te alcanza: ${origen.nombre} tiene ${pesos(origen.saldo)}.`;
+    else if (monto > 0 && monto > origen.saldo + 0.004) errores.cuenta_origen_id = `No te alcanza: ${origen.nombre} tiene ${pesos(origen.saldo)}.`;
     if (!campos.fecha.value) errores.fecha = "Escribe una fecha válida.";
     else if (campos.fecha.value > hoy) errores.fecha = "La fecha no puede ser futura.";
     return errores;
@@ -211,7 +220,7 @@
     if (Object.keys(errores).length) return mostrarErrores(errores, alerta);
 
     const cuerpo = {
-      monto: digitosCampo(campos.monto.value),
+      monto: montoExacto ?? digitosCampo(campos.monto.value),
       cuenta_origen_id: Number(campos.cuenta_origen_id.value),
       fecha: campos.fecha.value,
     };
@@ -244,7 +253,7 @@
     const nombre = document.createElement("strong");
     nombre.textContent = tarjeta.nombre;
     confirmar.querySelector("[data-confirmar-texto]").replaceChildren(
-      `¿Eliminar el pago de ${pesos(entero(actual.monto))} a `, nombre, "? Vuelve a sumar a su deuda.");
+      `¿Eliminar el pago de ${pesos(numero(actual.monto))} a `, nombre, "? Vuelve a sumar a su deuda.");
     mostrarAlerta(alertaConfirmar, null);
     form.hidden = true;
     confirmar.hidden = false;

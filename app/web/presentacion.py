@@ -137,6 +137,7 @@ def _datos_cuenta(c: CuentaConSaldo) -> dict:
         "cupo": _decimal(c.cuenta.cupo),
         "dia_pago": c.cuenta.dia_pago,
         "usos": c.usos,
+        "pagos": c.pagos,
     }
 
 

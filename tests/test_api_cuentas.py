@@ -125,3 +125,16 @@ def test_registrar_editar_y_eliminar_pago():
     assert client.delete(f"/api/v1/pagos/{creado['id']}").status_code == 204
     assert client.delete(f"/api/v1/pagos/{creado['id']}").status_code == 404
     assert client.put(f"/api/v1/pagos/{creado['id']}", json=pago()).status_code == 404
+
+
+@pytest.mark.parametrize(("saldo", "cupo", "inicial", "cupo_guardado"), [
+    ("1E+3", "1E+6", "1000", "1000000"),
+    ("840000.50", "3000000.00", "840000.50", "3000000"),
+    ("0.001", "2000000", "0.00", "2000000"),
+])
+def test_saldo_y_cupo_se_guardan_normalizados(saldo, cupo, inicial, cupo_guardado):
+    r = client.post(URL, json=cuerpo(nombre="Visa", tipo="tarjeta", icono="tarjeta", saldo=saldo, cupo=cupo,
+                                     dia_pago=20))
+
+    assert r.status_code == 201
+    assert (r.json()["inicial"], r.json()["cupo"]) == (inicial, cupo_guardado)

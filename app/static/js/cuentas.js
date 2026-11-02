@@ -285,6 +285,14 @@
   // ---------- Eliminar (con confirmación dentro del mismo diálogo) ----------
   const grupoDe = (cuenta) => (cuenta.tipo === "tarjeta" ? "tarjeta" : "dinero");
 
+  // "2 movimientos y 1 pago" (los pagos de tarjeta no son movimientos).
+  function textoUsos(movimientos, pagos) {
+    const partes = [];
+    if (movimientos) partes.push(movimientos === 1 ? "1 movimiento" : `${movimientos} movimientos`);
+    if (pagos) partes.push(pagos === 1 ? "1 pago" : `${pagos} pagos`);
+    return partes.join(" y ");
+  }
+
   // "Pasar sus movimientos a" solo ofrece las otras cuentas del mismo grupo. Devuelve cuántas hay.
   function prepararMover() {
     let hay = 0;
@@ -310,12 +318,13 @@
     mover.hidden = true;
     textoEliminar.textContent = "Eliminar";
     if (actual.usos) {
-      const plural = actual.usos === 1 ? "1 movimiento" : `${actual.usos} movimientos`;
+      const usos = textoUsos(actual.usos - (actual.pagos ?? 0), actual.pagos ?? 0);
+      const pronombre = actual.usos === 1 ? "perderlo, elige a qué cuenta pasarlo" : "perderlos, elige a qué cuenta pasarlos";
       if (prepararMover()) {
-        texto.replaceChildren(nombre, ` tiene ${plural}. Para no perderlos, elige a qué cuenta pasarlos.`);
+        texto.replaceChildren(nombre, ` tiene ${usos}. Para no ${pronombre}.`);
       } else {
         const unica = grupoDe(actual) === "tarjeta" ? "tu única tarjeta" : "tu única cuenta de dinero";
-        texto.replaceChildren(nombre, ` tiene ${plural} y es ${unica}. Crea otra para pasarle sus movimientos antes de eliminarla.`);
+        texto.replaceChildren(nombre, ` tiene ${usos} y es ${unica}. Crea otra para pasárselos antes de eliminarla.`);
         botonEliminar.disabled = true;
       }
     } else {

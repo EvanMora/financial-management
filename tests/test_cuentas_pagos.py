@@ -5,7 +5,7 @@ from decimal import Decimal
 import pytest
 
 from app.schemas.cuentas import CuentaEntrada, PagoEntrada
-from app.schemas.movimientos import FiltrosMovimientos
+from app.schemas.movimientos import FiltrosMovimientos, MovimientoEntrada
 from app.services import cuentas, movimientos
 from app.services.comun import ErrorValidacion, NoEncontrado
 
@@ -155,3 +155,23 @@ def test_pago_pasado_a_una_tarjeta_mas_nueva_se_puede_editar(monkeypatch):
     assert saldo(1) == Decimal("3412400")        # pero sí el saldo de origen
     assert errores(cuentas.actualizar_pago, U, p.id, pago("200000", fecha=date(2026, 11, 2))) == {
         "fecha": "La fecha es anterior a la creación de la cuenta."}
+
+
+def test_mensaje_de_eliminar_separa_movimientos_y_pagos():
+    nequi = cuentas.crear(U, CuentaEntrada(nombre="Nequi", tipo="billetera", icono="celular", tono="ciruela",
+                                           saldo=Decimal("500000")))
+    cuentas.registrar_pago(U, 4, pago("1000", origen=nequi.id, fecha=HOY))
+    assert errores(cuentas.eliminar, U, nequi.id) == {"mover_a": "Tiene 1 pago. Elige a qué cuenta pasarlo."}
+
+    movimientos.crear(U, MovimientoEntrada(tipo="gasto", monto=Decimal("2000"), categoria_id=3, cuenta_id=nequi.id,
+                                           fecha=HOY))
+    assert errores(cuentas.eliminar, U, nequi.id) == {
+        "mover_a": "Tiene 1 movimiento y 1 pago. Elige a qué cuenta pasarlos."}
+
+
+def test_el_panel_cuenta_los_pagos_aparte():
+    cuentas.registrar_pago(U, 4, pago("1000"))
+
+    tarjeta = cuentas.panel(U).tarjetas[0]
+
+    assert tarjeta.pagos == 1 and tarjeta.usos == 1

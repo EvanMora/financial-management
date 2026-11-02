@@ -63,6 +63,7 @@ class CuentaConSaldo(BaseModel):
     fecha_limite: date | None       # tarjetas: próxima vez que llega dia_pago
     dias_para_pagar: int | None
     usos: int                       # movimientos y pagos: si es > 0, eliminarla pide a dónde pasarlos
+    pagos: int                      # cuántos de los usos son pagos de tarjeta
 
 
 class PanelCuentas(BaseModel):

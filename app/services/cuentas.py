@@ -172,13 +172,21 @@ def _saldos(usuario_id: int, lista: list[Cuenta], sin_pago: int | None = None) -
     return saldos
 
 
+def _pagos_por_cuenta(usuario_id: int) -> dict[int, int]:
+    """Cuántos pagos tiene cada cuenta, como tarjeta o como cuenta de origen."""
+    cuantos: dict[int, int] = {}
+    for _, p in _pagos_de(usuario_id):
+        for cuenta_id in (p.tarjeta_id, p.origen_id):
+            cuantos[cuenta_id] = cuantos.get(cuenta_id, 0) + 1
+    return cuantos
+
+
 def _usos_por_cuenta(usuario_id: int) -> dict[int, int]:
     """Movimientos (de los meses ya sembrados) y pagos de cada cuenta."""
     from app.services import movimientos
     usos = movimientos.usos_por_cuenta(usuario_id)
-    for _, p in _pagos_de(usuario_id):
-        for cuenta_id in (p.tarjeta_id, p.origen_id):
-            usos[cuenta_id] = usos.get(cuenta_id, 0) + 1
+    for cuenta_id, cuantos in _pagos_por_cuenta(usuario_id).items():
+        usos[cuenta_id] = usos.get(cuenta_id, 0) + cuantos
     return usos
 
 
@@ -192,6 +200,7 @@ def panel(usuario_id: int) -> PanelCuentas:
     lista = listar(usuario_id)
     saldos = _saldos(usuario_id, lista)
     usos = _usos_por_cuenta(usuario_id)  # _saldos ya sembró desde la cuenta más vieja
+    pagos = _pagos_por_cuenta(usuario_id)
     hoy = _hoy()
     dinero, tarjetas = [], []
     for c in lista:
@@ -199,10 +208,11 @@ def panel(usuario_id: int) -> PanelCuentas:
         if es_tarjeta(c.tipo):
             fecha = proxima_fecha_pago(c.dia_pago, hoy)
             tarjetas.append(CuentaConSaldo(cuenta=c, saldo=saldo, disponible=c.cupo - saldo, fecha_limite=fecha,
-                                           dias_para_pagar=(fecha - hoy).days, usos=usos.get(c.id, 0)))
+                                           dias_para_pagar=(fecha - hoy).days, usos=usos.get(c.id, 0),
+                                           pagos=pagos.get(c.id, 0)))
         else:
             dinero.append(CuentaConSaldo(cuenta=c, saldo=saldo, disponible=None, fecha_limite=None,
-                                         dias_para_pagar=None, usos=usos.get(c.id, 0)))
+                                         dias_para_pagar=None, usos=usos.get(c.id, 0), pagos=pagos.get(c.id, 0)))
     tarjetas.sort(key=lambda t: (t.fecha_limite, t.cuenta.nombre))
     tienes = sum((c.saldo for c in dinero), Decimal(0))
     debes = sum((t.saldo for t in tarjetas), Decimal(0))
@@ -250,16 +260,35 @@ def _validar(usuario_id: int, e: CuentaEntrada, actual: Cuenta | None) -> str:
     return nombre
 
 
+def _normalizada(e: CuentaEntrada) -> CuentaEntrada:
+    """Saldo y cupo sin exponente ("1E+3" → 1000) y con a lo sumo 2 decimales, como los pagos."""
+    from app.services.movimientos import _normalizar_monto
+    return e.model_copy(update={"saldo": _normalizar_monto(e.saldo) if e.saldo is not None else None,
+                                "cupo": _normalizar_monto(e.cupo) if e.cupo is not None else None})
+
+
 def _datos(e: CuentaEntrada, nombre: str) -> dict:
     tarjeta = es_tarjeta(e.tipo)
     return {"nombre": nombre, "tipo": e.tipo, "icono": e.icono, "tono": e.tono,
             "cupo": e.cupo if tarjeta else None, "dia_pago": e.dia_pago if tarjeta else None}
 
 
+def _texto_usos(movimientos: int, pagos: int) -> str:
+    """"Tiene 1 movimiento y 2 pagos. Elige a qué cuenta pasarlos." (o "pasarlo" si es uno solo)."""
+    partes = []
+    if movimientos:
+        partes.append("1 movimiento" if movimientos == 1 else f"{movimientos} movimientos")
+    if pagos:
+        partes.append("1 pago" if pagos == 1 else f"{pagos} pagos")
+    pronombre = "pasarlo" if movimientos + pagos == 1 else "pasarlos"
+    return f"Tiene {' y '.join(partes)}. Elige a qué cuenta {pronombre}."
+
+
 def crear(usuario_id: int, e: CuentaEntrada) -> Cuenta:
     # TODO(backend): INSERT con usuario_id.
     global _siguiente_id
     nombre = _validar(usuario_id, e, None)
+    e = _normalizada(e)
     cuenta = Cuenta(id=_siguiente_id, creada_en=_hoy(), inicial=e.saldo, **_datos(e, nombre))
     _siguiente_id += 1
     _cuentas[cuenta.id] = (usuario_id, cuenta)
@@ -273,6 +302,7 @@ def actualizar(usuario_id: int, id: int, e: CuentaEntrada) -> Cuenta:
     if actual is None:
         raise NoEncontrado(id)
     nombre = _validar(usuario_id, e, actual)
+    e = _normalizada(e)
     if es_tarjeta(actual.tipo) != es_tarjeta(e.tipo):
         inicial = e.saldo  # sin movimientos (lo validó _validar): el saldo de hoy es el punto de partida
     elif e.saldo is None:
@@ -301,8 +331,8 @@ def eliminar(usuario_id: int, id: int, mover_a: int | None = None) -> None:
             unica = "tu única tarjeta" if tarjeta else "tu única cuenta de dinero"
             raise ErrorValidacion({"mover_a": f"Es {unica}. Crea otra para pasarle sus movimientos antes de eliminarla."})
         if mover_a is None:
-            plural = "1 movimiento" if usos == 1 else f"{usos} movimientos"
-            raise ErrorValidacion({"mover_a": f"Tiene {plural}. Elige a qué cuenta pasarlos."})
+            pagos = _pagos_por_cuenta(usuario_id).get(id, 0)
+            raise ErrorValidacion({"mover_a": _texto_usos(usos - pagos, pagos)})
         if destino is None or destino.id == id:
             raise ErrorValidacion({"mover_a": "Elige otra cuenta."})
         if es_tarjeta(destino.tipo) != tarjeta:
