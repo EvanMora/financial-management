@@ -6,7 +6,10 @@
 <link rel="stylesheet" href="{{ url_for('static', path='css/resumen.css') }}">
 {% endblock %}
 
-{% block acciones %}{% with ruta = "resumen" %}{% include "app/_selector_mes.html" %}{% endwith %}{% endblock %}
+{% block acciones %}
+{% if ia_disponible %}{% include "app/_analisis.html" %}{% endif %}
+{% with ruta = "resumen" %}{% include "app/_selector_mes.html" %}{% endwith %}
+{% endblock %}
 
 {% block contenido %}
 {% set mes = resumen.mes | nombre_mes %}
@@ -14,7 +17,13 @@
   <div class="stage__summary">
     <p class="label">Saldo total</p>
     <p class="big">{{ resumen.saldo_total | dinero("auto") }}</p>
-    <a class="link-row" href="/cuentas">En {{ resumen.cuentas | length }} cuenta{{ "s" if resumen.cuentas | length != 1 }} · Ver cuentas</a>
+    <a class="link-row" href="/cuentas">
+      {%- if resumen.deuda_tarjetas > 0 -%}
+      Debes <span class="num">{{ resumen.deuda_tarjetas | dinero }}</span> en tarjetas · Ver cuentas
+      {%- else -%}
+      En {{ resumen.cuentas | length }} cuenta{{ "s" if resumen.cuentas | length != 1 }} · Ver cuentas
+      {%- endif -%}
+    </a>
 
     <div class="stage__split">
       <div>
@@ -84,8 +93,8 @@
       {% for m in resumen.movimientos_recientes %}
       <li>
         <span class="rows__name">
-          <span class="icon-bubble">{{ iconos.categoria(m.categoria) }}</span>
-          <span>{{ m.descripcion }}<span class="sub">{{ m.fecha | fecha_corta }} · {{ m.cuenta }}</span></span>
+          <span class="icon-bubble">{{ iconos.categoria(m.categoria.nombre) }}</span>
+          <span>{{ m.descripcion or m.categoria.nombre }}<span class="sub">{{ m.fecha | fecha_corta }} · {{ m.cuenta.nombre }}</span></span>
         </span>
         {% if m.tipo == "ingreso" %}
         <span class="num income">{{ m.monto | dinero("+") }}</span>

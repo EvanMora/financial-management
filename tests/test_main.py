@@ -5,8 +5,9 @@ from app.main import app
 client = TestClient(app)
 
 def test_read_home():
-    response = client.get("/")
+    # La raíz ya no responde un JSON: lleva al Resumen (ver app/main.py).
+    response = client.get("/", follow_redirects=False)
 
-    assert response.status_code == 200
+    assert response.status_code == 307
 
-    assert response.json() == {"mensaje": "Hola gestion finanzas"}
+    assert response.headers["location"] == "/resumen"

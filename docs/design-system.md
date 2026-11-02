@@ -59,6 +59,7 @@ Los colores de estado también cumplen sobre su propio fondo `*-bg` (4.7:1 o má
 - Columnas de máximo 24px, con esquinas de 4px arriba y rectas en la base. Líneas de 2px. Puntos de 8px con un aro de 2px del color de la superficie.
 - El periodo actual va en el color fuerte (`--color-income` o `--color-text`) y los anteriores en el suave (`--chart-income-muted`, `--chart-ink-muted`).
 - **No usamos colores categóricos.** Verde, naranja y rojo ya significan ingreso, alerta y exceso. Para comparar categorías se usan barras de un solo tono, con la mayor resaltada.
+- **Única excepción: los tonos de las cuentas.** Cada cuenta tiene un tono (`--tono-*` en `tokens.css`) que va **solo en el cuadrado de su ícono**, nunca en montos, barras, texto ni fondos de tarjetas. Sirven para reconocer cada cuenta de un vistazo. Son 8 tonos apagados, con trazo de 4.5:1 o más sobre su fondo y lejos del verde de ingreso, el naranja de alerta y el rojo de error (`tests/test_tonos.py` lo comprueba).
 - Los estados (alerta, excedido) llevan siempre ícono y texto, nunca solo color.
 - Con dos o más series hay leyenda. Con una sola, el título la nombra.
 - El texto de las gráficas usa colores de texto, no el color de la serie.
@@ -81,6 +82,37 @@ Después del login la app es una aplicación con **barra lateral**, no una pági
 - **Barra superior:** título de la sección y sus acciones (por ejemplo, el selector de mes). Es fija y translúcida, como la barra del login.
 - **Celular (≤ 760px):** la barra se vuelve un cajón que entra desde la izquierda sobre el contenido. Como flota sobre contenido, es el único lugar de la app con vidrio.
 - **Una ruta por sección.** El paso de una a otra lo anima el navegador con View Transitions (`@view-transition`): la barra se queda quieta, la píldora se desliza a la nueva sección y el contenido viejo se desvanece mientras el nuevo entra escalonado (`style="--i: n"`). En Firefox la página cambia sin animación.
+
+## Formularios y diálogos de la app
+
+Los controles nuevos de la sección Movimientos salen de los del login. No agregan colores, radios ni sombras. Están en `app.css` porque el diálogo se usa en todas las secciones.
+
+- **Control segmentado** (`.segmented`): radios nativos ocultos dentro de una píldora `--color-canvas`. La opción elegida es una píldora blanca con `--ring-strong`, el token de "control seleccionado". Se usa para Todos/Ingresos/Gastos en los filtros y para Gasto/Ingreso en el diálogo.
+- **Select en píldora** (`.select`, `.select--lg` dentro de formularios): mismo borde, hover y foco que `.float-field__input`, con una flecha propia en SVG.
+- **Diálogo** (`.dialog`, un `<dialog>` nativo): tarjeta blanca de 28px **sin sombra** sobre el mismo fondo oscuro del cajón del celular (`rgba(29, 29, 31, 0.18)`). Mide 480px en escritorio y ocupa toda la pantalla en el celular. Los campos, los errores por campo, `.alert--danger` y el botón con spinner y check son los del login. Se cierra con ×, con Esc o haciendo clic en el fondo.
+- **Botón destructivo** (`.btn--danger`): fondo `--color-danger`. Solo se usa para confirmar una eliminación. Antes de confirmar, la acción es un botón de texto rojo ("Eliminar movimiento").
+- **Aviso** (`.toast`): píldora negra como "Nuevo movimiento", abajo al centro, 4 s, con `role="status"`. Confirma una acción ("Movimiento guardado"), nunca muestra errores; los errores van dentro del formulario.
+- **Asistente con IA** (solo si hay `GEMINI_API_KEY`): se marca con el ícono ✦. Cada sección lo usa para una cosa distinta y lo ofrece desde un **menú desplegable de la barra superior** (`.asistente`, manejado por `desplegable.js`): una píldora como el selector de mes que despliega un panel `--color-surface-raised` con el filo del vidrio (`--glass-edge`) y **sin sombra ni transparencia**, porque lleva texto que tiene que leerse sobre cualquier contenido. En el celular el botón queda solo con el ícono y el panel ocupa el ancho de la pantalla.
+  - **Movimientos — "✦ Asistente":** registrar con una frase. El botón "Completar" es negro (`btn--ink`), nunca azul, porque el azul queda para "Guardar". Llena el diálogo "Nuevo movimiento" y la persona revisa y guarda; la IA nunca guarda. El mismo bloque aparece en el diálogo (fondo `--color-canvas`, solo al crear).
+  - **Resumen — "✦ Analizar mes":** de 1 a 3 observaciones con viñeta y un consejo en un bloque `--color-canvas`. Mientras carga, tres barras grises que laten (esqueleto). Termina con una nota de privacidad que dice qué ve la IA y qué no.
+  - **Cuentas:** sin IA en su pantalla, a propósito: saldos, cupos, deudas y pagos son los datos más sensibles. Para registrar con una frase, Gemini solo recibe los nombres de las cuentas.
+- **Montos con signo**: el balance y el neto de cada día son verdes con "+" si son positivos o cero, y van en el color del texto con "−" si son negativos. Nunca rojos: el rojo queda para errores y excesos de presupuesto.
+
+## Sección Categorías
+
+- **Dos tarjetas, Gastos e Ingresos**, con lo que sumó cada categoría en el mes del selector, de mayor a menor. Cada fila dice cuántos movimientos tiene y qué parte del total del grupo es. Las que suman $0 van en gris.
+- **Cada fila es un enlace** a Movimientos filtrado por esa categoría y ese mes.
+- **Predeterminadas y propias:** las predeterminadas son iguales para todos y no se cambian. Las propias llevan un lápiz que abre el diálogo para renombrarlas o eliminarlas. Si en una tarjeta no hay propias, no se reserva el espacio del lápiz.
+- **"Nueva categoría"** es la acción principal de la pantalla: botón azul en la barra superior (en el celular, solo el "+").
+- **Diálogo:** mismos componentes que el de movimientos (segmentado Gasto/Ingreso, campo flotante, confirmación de eliminar). Si la categoría ya tiene movimientos, el tipo queda fijo con una nota, y para eliminarla hay que elegir a qué categoría del mismo tipo pasarlos ("Pasar y eliminar").
+
+## Sección Cuentas
+
+- **Sin desplazar la página:** arriba, una tarjeta con **Tienes en total** (cifra grande), **Debes en tarjetas** y **Te queda** (verde con "+" o texto con "−"). Debajo, dos columnas: **Dinero | Tarjetas de crédito**. En el celular, una columna con las tarjetas primero, porque tienen fecha límite.
+- **Sin selector de mes:** los saldos son de hoy.
+- **Íconos de cuenta:** cuadrado de 38px con radio de 12px, ícono de trazo y el tono que eligió la persona (ver Reglas de color).
+- **Tarjetas:** deuda con "−" en el color del texto, barra de cupo usado de un solo tono (pista `--color-fill-muted`, relleno `--color-text`), "Disponible $X de $Y" y **"Registrar pago"** en negro (`btn--ink`), porque el azul es de "Nueva cuenta". Con deuda y a 5 días o menos de la fecha límite, la etiqueta va en `--color-warning` sobre su fondo, con texto ("Hoy", "Mañana", "Faltan N días"). Sin deuda dice "Al día". Pasar el cupo es un exceso: "Pasaste el cupo por $X" en rojo.
+- **Pagos de tarjeta en Movimientos:** fila en su día con el ícono de la tarjeta, "Desde {cuenta} · No cuenta como gasto" y el monto en gris sin signo. No suman en los totales ni en el neto del día.
 
 ## Movimiento
 

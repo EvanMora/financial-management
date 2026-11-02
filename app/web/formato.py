@@ -5,6 +5,7 @@ from decimal import ROUND_HALF_UP, Decimal
 MESES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto",
          "septiembre", "octubre", "noviembre", "diciembre"]
 MESES_CORTOS = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"]
+DIAS = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
 MENOS = "−"  # signo menos tipográfico, no guion
 
 
@@ -29,6 +30,11 @@ def fecha_corta(valor: date) -> str:
     return f"{valor.day} {MESES_CORTOS[valor.month - 1]}"
 
 
+def fecha_larga(valor: date) -> str:
+    """Sábado 31 de octubre"""
+    return f"{DIAS[valor.weekday()].capitalize()} {valor.day} de {MESES[valor.month - 1]}"
+
+
 def nombre_mes(mes: int) -> str:
     return MESES[mes - 1]
 
@@ -37,4 +43,5 @@ def registrar(env) -> None:
     env.filters["dinero"] = dinero
     env.filters["porcentaje"] = porcentaje
     env.filters["fecha_corta"] = fecha_corta
+    env.filters["fecha_larga"] = fecha_larga
     env.filters["nombre_mes"] = nombre_mes
