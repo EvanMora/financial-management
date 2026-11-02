@@ -39,6 +39,27 @@
   --color-danger: #d70015;          /* presupuesto excedido, errores, acciones destructivas (4.8:1+) */
   --color-danger-bg: #fdeeed;
 
+  /* ---------- Tonos de los íconos de cuentas ----------
+     Única excepción a "no usamos colores categóricos": solo en el cuadrado del ícono de una cuenta,
+     nunca en montos, barras, texto ni fondos. Trazo 4.5:1+ sobre su fondo y lejos del verde de
+     ingreso, el naranja de alerta y el rojo de error (tests/test_tonos.py). */
+  --tono-azul: #1f4e9a;
+  --tono-azul-bg: #e4ecf9;
+  --tono-indigo: #3a3f9e;
+  --tono-indigo-bg: #e7e8f8;
+  --tono-violeta: #5b2fa6;
+  --tono-violeta-bg: #eee6f8;
+  --tono-ciruela: #8a2a68;
+  --tono-ciruela-bg: #f5e4f0;
+  --tono-petroleo: #1d5a68;
+  --tono-petroleo-bg: #e0eef1;
+  --tono-cafe: #6e4a2f;
+  --tono-cafe-bg: #f1e8e1;
+  --tono-arena: #6b5a1e;
+  --tono-arena-bg: #f3eedc;
+  --tono-grafito: #3a3a40;
+  --tono-grafito-bg: #ebebee;
+
   /* ---------- Tipografía ---------- */
   /* Inter primero: en Chromium para Linux (comprobado), -apple-system y BlinkMacSystemFont
      equivalen a la fuente del sistema y taparían a Inter. Se conservan como respaldo. */

@@ -27,8 +27,9 @@ class GastoCategoria(BaseModel):
 class ResumenDashboard(BaseModel):
     anio: int
     mes: int
-    saldo_total: Decimal                            # suma del saldo de todas las cuentas
-    cuentas: list[CuentaSaldo]
+    saldo_total: Decimal                            # suma del saldo de las cuentas de dinero (sin tarjetas)
+    cuentas: list[CuentaSaldo]                      # solo las de dinero
+    deuda_tarjetas: Decimal                         # suma de lo que se debe en tarjetas de crédito
     ingresos_mes: Decimal
     gastos_mes: Decimal
     gastos_por_categoria: list[GastoCategoria]      # solo gastos del mes, de mayor a menor

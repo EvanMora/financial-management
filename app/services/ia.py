@@ -2,8 +2,10 @@
 
 - Movimientos — interpretar(): frase → movimiento sugerido para el diálogo "Nuevo movimiento".
 - Resumen — analizar_mes(): cifras del mes → 1 a 3 observaciones y un consejo.
-- Cuentas: sin IA a propósito. Nombres de bancos y saldos son los datos más sensibles de la app y
-  no hacen falta para nada de lo anterior, así que nunca salen hacia Gemini.
+- Cuentas: sin IA en su pantalla, a propósito. Saldos, cupos, deudas y pagos de tarjeta son los
+  datos más sensibles de la app y nunca salen hacia Gemini. Para registrar con una frase, Gemini
+  recibe solo los nombres de las cuentas (id: nombre), para entender "con Nequi" o "con la tarjeta"
+  (tests/test_ia.py comprueba que el prompt no lleva cifras de cuentas).
 
 Registrar con una frase. Flujo: frase del usuario → Gemini responde JSON con la forma de _RespuestaGemini (salida
 estructurada) → _limpiar() descarta todo lo que no sea válido contra el catálogo y las reglas del

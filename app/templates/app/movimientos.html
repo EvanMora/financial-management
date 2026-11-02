@@ -65,8 +65,12 @@
 
       <select class="select" name="cuenta" aria-label="Cuenta">
         <option value="">Todas las cuentas</option>
-        {% for c in cuentas %}
-        <option value="{{ c.id }}"{% if f.cuenta_id == c.id %} selected{% endif %}>{{ c.nombre }}</option>
+        {% for grupo, refs in grupos_cuentas %}
+        <optgroup label="{{ grupo }}">
+          {% for c in refs %}
+          <option value="{{ c.id }}"{% if f.cuenta_id == c.id %} selected{% endif %}>{{ c.nombre }}</option>
+          {% endfor %}
+        </optgroup>
         {% endfor %}
       </select>
 
@@ -94,7 +98,7 @@
   <div class="day">
     <h2 class="day__head">
       <span class="label">{{ dia.fecha | fecha_larga }}</span>
-      {{ firmado(dia.neto, "label") }}
+      {% if dia.filas %}{{ firmado(dia.neto, "label") }}{% endif %}
     </h2>
     <ul class="rows">
       {% for fila in dia.filas %}
@@ -109,6 +113,16 @@
         {% else %}
         <span class="num">{{ m.monto | dinero("-") }}</span>
         {% endif %}
+      </li>
+      {% endfor %}
+      {% for fila in dia.pagos %}
+      {% set p = fila.p %}
+      <li class="movs__row" data-pago='{{ fila.datos | tojson }}'>
+        <span class="rows__name">
+          <span class="icon-bubble movs__pago-icono tono-{{ p.tarjeta_tono }}">{{ iconos.cuenta(p.tarjeta_icono) }}</span>
+          <span>Pago {{ p.tarjeta.nombre }}<span class="sub">Desde {{ p.origen.nombre }} · No cuenta como gasto</span></span>
+        </span>
+        <span class="num movs__neutro">{{ p.monto | dinero }}</span>
       </li>
       {% endfor %}
     </ul>
@@ -130,7 +144,10 @@
 </section>
 {% endblock %}
 
+{% block dialogos %}{% include "app/_dialogo_pago.html" %}{% endblock %}
+
 {% block scripts %}
 {{ super() }}
+<script src="{{ url_for('static', path='js/pago-dialogo.js') }}" defer></script>
 <script src="{{ url_for('static', path='js/movimientos.js') }}" defer></script>
 {% endblock %}

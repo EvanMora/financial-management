@@ -851,6 +851,35 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+/* Tonos del ícono de una cuenta (única excepción de color; ver tokens.css). */
+.tono-azul { background: var(--tono-azul-bg); color: var(--tono-azul); }
+.tono-indigo { background: var(--tono-indigo-bg); color: var(--tono-indigo); }
+.tono-violeta { background: var(--tono-violeta-bg); color: var(--tono-violeta); }
+.tono-ciruela { background: var(--tono-ciruela-bg); color: var(--tono-ciruela); }
+.tono-petroleo { background: var(--tono-petroleo-bg); color: var(--tono-petroleo); }
+.tono-cafe { background: var(--tono-cafe-bg); color: var(--tono-cafe); }
+.tono-arena { background: var(--tono-arena-bg); color: var(--tono-arena); }
+.tono-grafito { background: var(--tono-grafito-bg); color: var(--tono-grafito); }
+
+/* Diálogo de pago de tarjeta (Cuentas y Movimientos). */
+.pago-detalle {
+  margin-top: var(--space-4);
+}
+
+.pago-rapido {
+  display: flex;
+  gap: var(--space-8);
+}
+
+.pago-rapido .btn {
+  font-size: var(--text-caption);
+}
+
+.pago-despues {
+  min-height: 1.4em;
+  text-align: center;
+}
+
 .dialog__confirm p {
   color: var(--color-text-secondary);
 }

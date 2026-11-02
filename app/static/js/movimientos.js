@@ -3,7 +3,8 @@
  * - Filtros: se aplican solos (selects y tipo al cambiar; búsqueda 300 ms después de escribir).
  *   Sin JS funciona igual con el botón "Filtrar". Los parámetros vacíos no se ponen en la URL.
  * - Celular: el panel "Filtros · N" empieza cerrado.
- * - Filas: abren el diálogo en modo edición (Enter o Espacio con teclado).
+ * - Filas: abren el diálogo en modo edición (Enter o Espacio con teclado). Las de pagos de
+ *   tarjeta abren el diálogo de pago.
  * - ?nuevo=1 abre el diálogo y ?guardado=<id> resalta la fila guardada.
  */
 (() => {
@@ -72,6 +73,23 @@
       if (event.key === "Enter" || event.key === " ") {
         event.preventDefault();
         editar(fila);
+      }
+    });
+  }
+
+  // Pagos de tarjeta: abren el diálogo de pago en modo edición (pago-dialogo.js).
+  for (const fila of document.querySelectorAll("[data-pago]")) {
+    const datos = JSON.parse(fila.dataset.pago);
+    const abrir = () => window.dialogoPago?.abrir({ tarjetaId: datos.tarjeta_id, pago: datos });
+    fila.setAttribute("role", "button");
+    fila.setAttribute("tabindex", "0");
+    fila.setAttribute("aria-haspopup", "dialog");
+    fila.setAttribute("aria-label", `Editar ${datos.nombre}`);
+    fila.addEventListener("click", abrir);
+    fila.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        abrir();
       }
     });
   }

@@ -152,6 +152,16 @@
   }
 }
 
+/* Pago de tarjeta: monto en gris y sin signo, porque no es gasto ni ingreso. El ícono lleva el
+   tono de la tarjeta (los .tono-* están en app.css). */
+.movs__neutro {
+  color: var(--color-text-secondary);
+}
+
+.movs__pago-icono svg {
+  stroke: currentColor;
+}
+
 .movs__empty {
   display: grid;
   justify-items: center;
