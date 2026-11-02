@@ -19,7 +19,7 @@ from app.schemas.movimientos import (
     Movimiento,
     MovimientoEntrada,
 )
-from app.services import categorias
+from app.services import categorias, cuentas
 from app.services.comun import ErrorValidacion, NoEncontrado  # la API los toma de aquí: servicio.ErrorValidacion
 from app.services.comun import normalizar as _normalizar
 
@@ -28,9 +28,7 @@ MAX_DESCRIPCION = 80
 # monto como 1E+30 no cabe en la precisión de Decimal y rompe el formato de toda la pantalla.
 MAX_MONTO = Decimal("1000000000000")
 
-# TODO(backend): cuentas del usuario. Las categorías salen de services/categorias.py.
-_CUENTAS = [CuentaRef(id=1, nombre="Cuenta de ahorros"), CuentaRef(id=2, nombre="Billetera digital"),
-            CuentaRef(id=3, nombre="Efectivo")]
+# Las cuentas salen de services/cuentas.py y las categorías de services/categorias.py.
 
 # Plantilla de cada mes: (día, descripción, categoría, cuenta, tipo, monto).
 _PLANTILLA = [
@@ -72,10 +70,6 @@ def _ultimo_dia(anio: int, mes: int) -> int:
     return (siguiente - date(anio, mes, 1)).days
 
 
-def _cuenta(nombre: str) -> CuentaRef:
-    return next(c for c in _CUENTAS if c.nombre == nombre)
-
-
 def _sembrar(anio: int, mes: int) -> None:
     if (anio, mes) in _meses_sembrados:
         return
@@ -85,11 +79,12 @@ def _sembrar(anio: int, mes: int) -> None:
     # De la más vieja a la más nueva, para que los ids crezcan con la fecha.
     for dia, descripcion, categoria, cuenta, tipo, monto in reversed(_PLANTILLA):
         fecha = date(anio, mes, min(dia, ultimo))
-        if fecha > limite:
+        ref_cuenta = cuentas.ref_plantilla(cuenta)  # None si la persona eliminó esa cuenta
+        if fecha > limite or ref_cuenta is None:
             continue
         nuevo = Movimiento(id=_nuevo_id(), fecha=fecha, descripcion=descripcion,
                            categoria=categorias.ref(categorias.predeterminada(categoria)),
-                           cuenta=_cuenta(cuenta), tipo=tipo, monto=Decimal(monto))
+                           cuenta=ref_cuenta, tipo=tipo, monto=Decimal(monto))
         _movimientos[nuevo.id] = nuevo
 
 
@@ -106,8 +101,37 @@ def _coincide(m: Movimiento, f: FiltrosMovimientos, buscar: str) -> bool:
 
 
 def catalogo(usuario_id: int) -> tuple[list[CuentaRef], list[CategoriaRef]]:
-    # TODO(backend): cuentas de usuario_id.
-    return list(_CUENTAS), [categorias.ref(c) for c in categorias.listar(usuario_id)]
+    return ([cuentas.ref(c) for c in cuentas.listar(usuario_id)],
+            [categorias.ref(c) for c in categorias.listar(usuario_id)])
+
+
+def desde(usuario_id: int, fecha: date) -> list[Movimiento]:
+    """Los movimientos con fecha >= fecha. Antes siembra cada mes desde ahí hasta hoy, para que
+    los saldos no dependan de qué meses se hayan visitado."""
+    # TODO(backend): SELECT ... WHERE usuario_id = :usuario_id AND fecha >= :fecha.
+    anio, mes = fecha.year, fecha.month
+    limite = hoy()
+    while (anio, mes) <= (limite.year, limite.month):
+        _sembrar(anio, mes)
+        anio, mes = (anio + 1, 1) if mes == 12 else (anio, mes + 1)
+    return [m for m in _movimientos.values() if m.fecha >= fecha]
+
+
+def usos_por_cuenta(usuario_id: int) -> dict[int, int]:
+    """Cuántos movimientos tiene cada cuenta, en los meses ya sembrados."""
+    # TODO(backend): SELECT cuenta_id, COUNT(*) ... GROUP BY cuenta_id.
+    usos: dict[int, int] = {}
+    for m in _movimientos.values():
+        usos[m.cuenta.id] = usos.get(m.cuenta.id, 0) + 1
+    return usos
+
+
+def cambiar_cuenta(usuario_id: int, de_id: int, a: CuentaRef) -> None:
+    """Pone la cuenta "a" en los movimientos de la cuenta de_id: renombrar (de_id == a.id) o
+    pasar los movimientos de una cuenta que se va a eliminar."""
+    for id, m in _movimientos.items():
+        if m.cuenta.id == de_id:
+            _movimientos[id] = m.model_copy(update={"cuenta": a})
 
 
 def usos_por_categoria(usuario_id: int) -> dict[int, int]:
@@ -171,7 +195,8 @@ def _validar(usuario_id: int, entrada: MovimientoEntrada) -> tuple[CategoriaRef,
         errores["categoria_id"] = "Elige una categoría."
     elif categoria.tipo != entrada.tipo:
         errores["categoria_id"] = f"Esa categoría es de {'ingresos' if categoria.tipo == 'ingreso' else 'gastos'}."
-    cuenta = next((c for c in _CUENTAS if c.id == entrada.cuenta_id), None)
+    encontrada_cuenta = cuentas.obtener(usuario_id, entrada.cuenta_id)
+    cuenta = cuentas.ref(encontrada_cuenta) if encontrada_cuenta else None
     if cuenta is None:
         errores["cuenta_id"] = "Elige una cuenta."
     if entrada.fecha > hoy():

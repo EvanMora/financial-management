@@ -121,7 +121,7 @@ def test_eliminar_y_no_encontrado():
 def test_catalogo():
     cuentas, categorias = servicio.catalogo(1)
 
-    assert [c.nombre for c in cuentas] == ["Cuenta de ahorros", "Billetera digital", "Efectivo"]
+    assert [c.nombre for c in cuentas] == ["Cuenta de ahorros", "Billetera digital", "Efectivo", "Tarjeta de crédito"]
     assert {c.nombre: c.tipo for c in categorias} == {
         "Salario": "ingreso", "Otros ingresos": "ingreso", "Mercado": "gasto", "Transporte": "gasto",
         "Arriendo": "gasto", "Ocio": "gasto", "Otros gastos": "gasto",
