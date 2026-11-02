@@ -6,11 +6,11 @@ pantalla no se toca.
 
 Todo el dinero va en Decimal (nunca float) y sin formato: el formato lo pone la plantilla.
 """
-from datetime import date
 from decimal import Decimal
-from typing import Literal
 
 from pydantic import BaseModel
+
+from app.schemas.movimientos import Movimiento
 
 
 class CuentaSaldo(BaseModel):
@@ -24,15 +24,6 @@ class GastoCategoria(BaseModel):
     total: Decimal
 
 
-class MovimientoReciente(BaseModel):
-    fecha: date
-    descripcion: str
-    categoria: str
-    cuenta: str
-    tipo: Literal["ingreso", "gasto"]
-    monto: Decimal  # siempre positivo; el tipo dice si suma o resta
-
-
 class ResumenDashboard(BaseModel):
     anio: int
     mes: int
@@ -41,4 +32,4 @@ class ResumenDashboard(BaseModel):
     ingresos_mes: Decimal
     gastos_mes: Decimal
     gastos_por_categoria: list[GastoCategoria]      # solo gastos del mes, de mayor a menor
-    movimientos_recientes: list[MovimientoReciente]  # los últimos del mes, del más nuevo al más viejo
+    movimientos_recientes: list[Movimiento]  # los últimos del mes, del más nuevo al más viejo
