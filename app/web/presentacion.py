@@ -3,10 +3,9 @@ las gráficas del Resumen, los días agrupados de Movimientos y los grupos de Ca
 se consulta nada; solo se hacen cuentas de presentación."""
 from datetime import date
 from decimal import Decimal
-from itertools import groupby
 
 from app.schemas.categorias import CategoriasDelMes
-from app.schemas.cuentas import NOMBRE_TIPO, CuentaConSaldo, PanelCuentas
+from app.schemas.cuentas import NOMBRE_TIPO, CuentaConSaldo, Pago, PanelCuentas
 from app.schemas.dashboard import ResumenDashboard
 from app.schemas.movimientos import ListaMovimientos, Movimiento
 from app.web.formato import fecha_corta
@@ -58,15 +57,36 @@ def datos_edicion(m: Movimiento) -> dict:
     }
 
 
-def vista_movimientos(lista: ListaMovimientos) -> dict:
+def datos_pago_edicion(p: Pago) -> dict:
+    """Lo que necesita el diálogo de pago para abrir un pago en modo edición (va en data-pago)."""
+    return {
+        "id": p.id,
+        "tarjeta_id": p.tarjeta.id,
+        "cuenta_origen_id": p.origen.id,
+        "monto": format(p.monto, "f"),
+        "fecha": p.fecha.isoformat(),
+        "nombre": f"Pago {p.tarjeta.nombre}",
+    }
+
+
+def vista_movimientos(lista: ListaMovimientos, pagos: list[Pago] = ()) -> dict:
+    """Días del más nuevo al más viejo. Los pagos de tarjeta van en su día, después de los
+    movimientos, y no cuentan en el neto: no son gastos ni ingresos."""
     f = lista.filtros
+    por_dia: dict[date, list[Movimiento]] = {}
+    for m in lista.movimientos:
+        por_dia.setdefault(m.fecha, []).append(m)
+    pagos_por_dia: dict[date, list[Pago]] = {}
+    for p in pagos:
+        pagos_por_dia.setdefault(p.fecha, []).append(p)
     dias = []
-    for fecha, grupo in groupby(lista.movimientos, key=lambda m: m.fecha):
-        movimientos = list(grupo)
+    for fecha in sorted(por_dia.keys() | pagos_por_dia.keys(), reverse=True):
+        movimientos = por_dia.get(fecha, [])
         dias.append({
             "fecha": fecha,
             "neto": _neto(movimientos),
             "filas": [{"m": m, "datos": datos_edicion(m)} for m in movimientos],
+            "pagos": [{"p": p, "datos": datos_pago_edicion(p)} for p in pagos_por_dia.get(fecha, [])],
         })
     return {
         "dias": dias,

@@ -70,8 +70,10 @@
         <label class="field__label" for="mov-cuenta">Cuenta</label>
         <select class="select select--lg" id="mov-cuenta" name="cuenta_id" aria-describedby="cuenta_id-error" required>
           <option value="">Elige una</option>
-          {% for c in catalogo_cuentas %}
-          <option value="{{ c.id }}">{{ c.nombre }}</option>
+          {% for grupo, refs in grupos_cuentas %}
+          <optgroup label="{{ grupo }}">
+            {% for c in refs %}<option value="{{ c.id }}">{{ c.nombre }}</option>{% endfor %}
+          </optgroup>
           {% endfor %}
         </select>
         <p class="field__message field__message--error" id="cuenta_id-error" hidden></p>

@@ -97,3 +97,67 @@ def test_monto_con_exponente_se_ofrece_sin_exponente_para_editar():
     html = client.get("/movimientos?anio=2026&mes=10&q=exponente").text
 
     assert "&#34;monto&#34;: &#34;100000&#34;" in html or '"monto": "100000"' in html
+
+
+# ---------- Pagos de tarjeta y cuentas agrupadas ----------
+
+def _pagar(fecha="2026-11-12", monto="300000"):
+    r = client.post("/api/v1/cuentas/4/pagos", json={"monto": monto, "cuenta_origen_id": 1, "fecha": fecha})
+    assert r.status_code == 201
+    return r.json()
+
+
+def _totales(html):
+    return html.split('aria-label="Totales', 1)[1].split("</section>", 1)[0]
+
+
+def test_pago_en_la_lista_sin_sumar(monkeypatch):
+    monkeypatch.setattr(servicio, "hoy", lambda: date(2026, 11, 15))
+    antes = client.get("/movimientos?anio=2026&mes=11").text
+    _pagar()
+
+    html = client.get("/movimientos?anio=2026&mes=11").text
+    lista = html.split("data-lista", 1)[1]
+
+    assert "Pago Tarjeta de crédito" in lista
+    assert "Desde Cuenta de ahorros · No cuenta como gasto" in lista
+    assert '<span class="num movs__neutro">$300.000</span>' in lista
+    assert "Jueves 12 de noviembre" in lista
+    assert _totales(html) == _totales(antes)
+    assert "data-pago=" in lista and 'id="dialogo-pago"' in html and "js/pago-dialogo.js" in html
+
+
+@pytest.mark.parametrize(("consulta", "aparece"), [
+    ("tipo=gasto", False),
+    ("categoria=3", False),
+    ("cuenta=4", True),
+    ("cuenta=2", False),
+    ("q=pago", True),
+])
+def test_filtros_y_pagos(monkeypatch, consulta, aparece):
+    monkeypatch.setattr(servicio, "hoy", lambda: date(2026, 11, 15))
+    _pagar()
+
+    lista = lista_html(f"/movimientos?anio=2026&mes=11&{consulta}")
+
+    assert ("Pago Tarjeta de crédito" in lista) is aparece
+
+
+def test_cuentas_agrupadas():
+    html = client.get("/movimientos?anio=2026&mes=10").text
+    filtro = html.split('name="cuenta"', 1)[1].split("</select>", 1)[0]
+    dialogo = html.split('id="mov-cuenta"', 1)[1].split("</select>", 1)[0]
+
+    for select in (filtro, dialogo):
+        assert '<optgroup label="Dinero">' in select and '<optgroup label="Tarjetas">' in select
+        assert "Tarjeta de crédito" in select.split('<optgroup label="Tarjetas">', 1)[1]
+
+
+def test_estado_vacio_con_solo_pagos():
+    _pagar(fecha="2026-11-01", monto="1000")  # hoy = 1 nov: la plantilla aún no tiene días
+
+    html = client.get("/movimientos?anio=2026&mes=11").text
+
+    assert "No hay movimientos en noviembre" not in html
+    assert "Pago Tarjeta de crédito" in html
+    assert "+$0" not in html.split("data-lista", 1)[1]  # un día solo con pagos no muestra neto

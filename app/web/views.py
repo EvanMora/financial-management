@@ -158,10 +158,12 @@ def movimientos(
     anio, mes = _periodo(anio, mes)
     filtros = _filtros(tipo, cuenta, categoria, q)
     lista = movimientos_servicio.listar(USUARIO_DEMO["id"], anio, mes, filtros)
+    pagos = cuentas_servicio.pagos_del_mes(USUARIO_DEMO["id"], anio, mes, filtros)
     cuentas, categorias = movimientos_servicio.catalogo(USUARIO_DEMO["id"])
     context = _contexto_app(request, "movimientos") | {
         "lista": lista,
-        "vista": vista_movimientos(lista),
+        "vista": vista_movimientos(lista, pagos),
+        "pago": datos_pago(cuentas_servicio.panel(USUARIO_DEMO["id"])),
         "periodo": _navegacion_mes(anio, mes),
         "consulta": _consulta(filtros),
         "cuentas": cuentas,
