@@ -5,6 +5,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
+from app.services import movimientos
 from app.web.formato import nombre_mes
 
 client = TestClient(app)
@@ -35,7 +36,8 @@ def test_barra_contraida_se_recuerda_con_cookie():
     assert 'aria-expanded="false"' in contraida
 
 
-def test_resumen_muestra_las_cifras_del_contrato():
+def test_resumen_muestra_las_cifras_del_contrato(monkeypatch):
+    monkeypatch.setattr(movimientos, "hoy", lambda: date(2026, 11, 15))
     html = client.get("/resumen?anio=2026&mes=10").text
 
     assert "$4.382.900" in html
@@ -44,6 +46,18 @@ def test_resumen_muestra_las_cifras_del_contrato():
     assert "Te quedan <strong class=\"num\">$1.325.700</strong>" in html
     assert 'role="img"' in html and 'aria-label="Ingresos $3.200.000, gastos $1.874.300"' in html
     assert "Octubre 2026" in html
+
+
+def test_resumen_muestra_la_deuda(monkeypatch):
+    monkeypatch.setattr(movimientos, "hoy", lambda: date(2026, 11, 15))
+    deuda = 'Debes <span class="num">$840.000</span> en tarjetas'
+    assert deuda in client.get("/resumen?anio=2026&mes=10").text
+
+    r = client.post("/api/v1/cuentas/4/pagos", json={"monto": "840000", "cuenta_origen_id": 1, "fecha": "2026-11-12"})
+    assert r.status_code == 201
+    html = client.get("/resumen?anio=2026&mes=10").text
+    assert deuda not in html
+    assert "En 3 cuentas · Ver cuentas" in html
 
 
 def test_selector_de_mes():

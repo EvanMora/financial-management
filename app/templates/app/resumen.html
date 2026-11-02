@@ -17,7 +17,13 @@
   <div class="stage__summary">
     <p class="label">Saldo total</p>
     <p class="big">{{ resumen.saldo_total | dinero("auto") }}</p>
-    <a class="link-row" href="/cuentas">En {{ resumen.cuentas | length }} cuenta{{ "s" if resumen.cuentas | length != 1 }} · Ver cuentas</a>
+    <a class="link-row" href="/cuentas">
+      {%- if resumen.deuda_tarjetas > 0 -%}
+      Debes <span class="num">{{ resumen.deuda_tarjetas | dinero }}</span> en tarjetas · Ver cuentas
+      {%- else -%}
+      En {{ resumen.cuentas | length }} cuenta{{ "s" if resumen.cuentas | length != 1 }} · Ver cuentas
+      {%- endif -%}
+    </a>
 
     <div class="stage__split">
       <div>

@@ -82,3 +82,15 @@ def test_fecha_larga():
 
     assert fecha_larga(date(2026, 10, 31)) == "Sábado 31 de octubre"
     assert fecha_larga(date(2026, 11, 2)) == "Lunes 2 de noviembre"
+
+
+def test_saldos_reales_y_deuda(monkeypatch):
+    from app.services import movimientos
+    monkeypatch.setattr(movimientos, "hoy", lambda: date(2026, 11, 15))
+
+    r = obtener_resumen(1, 2026, 10)
+
+    assert r.saldo_total == Decimal("4382900")
+    assert r.deuda_tarjetas == Decimal("840000")
+    assert [c.nombre for c in r.cuentas] == ["Cuenta de ahorros", "Billetera digital", "Efectivo"]
+    assert r.cuentas[0].tipo == "Cuenta de ahorros"
