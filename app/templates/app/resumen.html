@@ -6,7 +6,10 @@
 <link rel="stylesheet" href="{{ url_for('static', path='css/resumen.css') }}">
 {% endblock %}
 
-{% block acciones %}{% with ruta = "resumen" %}{% include "app/_selector_mes.html" %}{% endwith %}{% endblock %}
+{% block acciones %}
+{% if ia_disponible %}{% include "app/_asistente.html" %}{% endif %}
+{% with ruta = "resumen" %}{% include "app/_selector_mes.html" %}{% endwith %}
+{% endblock %}
 
 {% block contenido %}
 {% set mes = resumen.mes | nombre_mes %}

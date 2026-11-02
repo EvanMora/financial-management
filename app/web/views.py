@@ -9,6 +9,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
 from app.schemas.movimientos import FiltrosMovimientos
+from app.services import ia as ia_servicio
 from app.services import movimientos as movimientos_servicio
 from app.services.dashboard import obtener_resumen
 from app.web import formato
@@ -51,6 +52,8 @@ def _contexto_app(request: Request, seccion: str) -> dict:
         "catalogo_cuentas": cuentas,
         "catalogo_categorias": categorias,
         "hoy_iso": movimientos_servicio.hoy().isoformat(),
+        # El asistente con Gemini solo aparece si hay GEMINI_API_KEY.
+        "ia_disponible": ia_servicio.configurado(),
     }
 
 
