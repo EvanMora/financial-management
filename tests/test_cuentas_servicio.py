@@ -240,3 +240,15 @@ def test_cuentas_por_usuario():
     assert (p.dinero, p.tarjetas, p.tienes) == ([], [], Decimal(0))
     nequi = cuentas.crear(2, entrada())
     assert cuentas.obtener(U, nequi.id) is None
+
+
+def test_editar_sin_saldo_no_toca_el_saldo():
+    """El diálogo no manda el saldo si la persona no lo cambió: un gasto registrado mientras la
+    página estaba abierta no se pierde al renombrar."""
+    gasto(1)
+
+    cuentas.actualizar(U, 1, entrada("Ahorros", "ahorros", icono="banco").model_copy(update={"saldo": None}))
+
+    assert saldo(1) == Decimal("3562400")
+    assert errores(cuentas.crear, U, entrada().model_copy(update={"saldo": None})) == {
+        "saldo": "Escribe un saldo de 0 o más."}

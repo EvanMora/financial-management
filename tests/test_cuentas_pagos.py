@@ -140,3 +140,18 @@ def test_usos_incluyen_pagos_y_eliminar_los_mueve():
                                           saldo=Decimal(0), cupo=Decimal("1000000"), dia_pago=5))
     cuentas.eliminar(U, 4, mover_a=otra.id)
     assert cuentas.obtener_pago(U, p.id).tarjeta.id == otra.id
+
+
+def test_pago_pasado_a_una_tarjeta_mas_nueva_se_puede_editar(monkeypatch):
+    p = cuentas.registrar_pago(U, 4, pago("300000", fecha=date(2026, 11, 1)))
+    visa = cuentas.crear(U, CuentaEntrada(nombre="Visa", tipo="tarjeta", icono="tarjeta", tono="azul",
+                                          saldo=Decimal(0), cupo=Decimal("1000000"), dia_pago=5))
+    cuentas.eliminar(U, 4, mover_a=visa.id)
+
+    editado = cuentas.actualizar_pago(U, p.id, pago("200000", fecha=date(2026, 11, 1)))
+
+    assert editado.monto == Decimal("200000")
+    assert saldo(visa.id) == Decimal(0)          # fecha anterior a Visa: no cambia su deuda
+    assert saldo(1) == Decimal("3412400")        # pero sí el saldo de origen
+    assert errores(cuentas.actualizar_pago, U, p.id, pago("200000", fecha=date(2026, 11, 2))) == {
+        "fecha": "La fecha es anterior a la creación de la cuenta."}

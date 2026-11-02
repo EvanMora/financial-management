@@ -45,6 +45,7 @@
   let actual = null; // cuenta en edición (data-cuenta), o null si es nueva
   let ocupado = false;
   let iconoElegido = false; // si la persona tocó el ícono, cambiar la clase ya no lo cambia
+  let saldoAbierto = "";    // lo que tenía el campo al abrir: si no cambia, el saldo no se envía
 
   // ---------- Montos con puntos de miles (como en "Nuevo movimiento") ----------
   const miles = (digitos) => digitos.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
@@ -146,9 +147,11 @@
     iconoElegido = Boolean(cuenta);
     el.icono.value = cuenta?.icono ?? ICONO_POR_CLASE[esTarjeta ? "tarjeta" : el.clase.value];
     el.tono.value = cuenta?.tono ?? "azul";
-    // Un saldo negativo (gastos de más) no cabe en el campo, que es de 0 o más: queda vacío para escribir el real.
+    // Un saldo negativo (gastos de más) no cabe en el campo, que es de 0 o más: queda vacío, y si
+    // la persona no escribe nada el saldo se conserva.
     const saldo = cuenta && !String(cuenta.saldo).startsWith("-") ? digitosMonto(cuenta.saldo) : "";
     el.saldo.value = saldo ? miles(saldo) : "";
+    saldoAbierto = el.saldo.value;
     el.cupo.value = cuenta?.cupo ? miles(digitosMonto(cuenta.cupo)) : "";
     el.dia_pago.value = cuenta?.dia_pago ?? "";
     notaSaldo.hidden = !cuenta;
@@ -221,12 +224,16 @@
     ...opciones,
   });
 
+  // Al editar, el saldo solo se envía si la persona lo cambió (o si cambia de dinero a tarjeta):
+  // así un movimiento registrado mientras el diálogo estaba abierto no se pierde al renombrar.
+  const enviaSaldo = () => !actual || el.saldo.value !== saldoAbierto || grupo() !== grupoDe(actual);
+
   function validar() {
     const errores = {};
     const nombre = el.nombre.value.trim().replace(/\s+/g, " ");
     if (!nombre) errores.nombre = "Escribe un nombre.";
     else if (nombre.length > MAX_NOMBRE) errores.nombre = `Máximo ${MAX_NOMBRE} caracteres.`;
-    if (!digitosCampo(el.saldo.value)) errores.saldo = grupo() === "tarjeta" ? "Escribe una deuda de 0 o más." : "Escribe un saldo de 0 o más.";
+    if (enviaSaldo() && !digitosCampo(el.saldo.value)) errores.saldo = grupo() === "tarjeta" ? "Escribe una deuda de 0 o más." : "Escribe un saldo de 0 o más.";
     if (grupo() === "tarjeta") {
       if (!(Number(digitosCampo(el.cupo.value)) > 0)) errores.cupo = "Escribe un cupo mayor que 0.";
       if (!el.dia_pago.value) errores.dia_pago = "Elige un día entre 1 y 31.";
@@ -247,7 +254,7 @@
       tipo: tipo(),
       icono: el.icono.value,
       tono: el.tono.value,
-      saldo: digitosCampo(el.saldo.value),
+      saldo: enviaSaldo() ? digitosCampo(el.saldo.value) : null,
       cupo: tarjeta ? digitosCampo(el.cupo.value) : null,
       dia_pago: tarjeta ? Number(el.dia_pago.value) : null,
     };

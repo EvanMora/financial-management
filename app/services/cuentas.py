@@ -226,9 +226,11 @@ def _validar(usuario_id: int, e: CuentaEntrada, actual: Cuenta | None) -> str:
              for c in listar(usuario_id) if actual is None or c.id != actual.id):
         errores["nombre"] = "Ya tienes una cuenta con ese nombre."
 
-    if not e.saldo.is_finite() or e.saldo < 0:
+    cambia_grupo = actual is not None and es_tarjeta(actual.tipo) != tarjeta
+    sin_saldo = e.saldo is None and (actual is None or cambia_grupo)
+    if sin_saldo or (e.saldo is not None and (not e.saldo.is_finite() or e.saldo < 0)):
         errores["saldo"] = "Escribe una deuda de 0 o más." if tarjeta else "Escribe un saldo de 0 o más."
-    elif e.saldo >= MAX_MONTO:
+    elif e.saldo is not None and e.saldo >= MAX_MONTO:
         errores["saldo"] = "El monto es demasiado grande."
 
     if tarjeta:
@@ -273,6 +275,8 @@ def actualizar(usuario_id: int, id: int, e: CuentaEntrada) -> Cuenta:
     nombre = _validar(usuario_id, e, actual)
     if es_tarjeta(actual.tipo) != es_tarjeta(e.tipo):
         inicial = e.saldo  # sin movimientos (lo validó _validar): el saldo de hoy es el punto de partida
+    elif e.saldo is None:
+        inicial = actual.inicial  # no se tocó el saldo
     else:
         inicial = actual.inicial + e.saldo - _saldos(usuario_id, [actual])[id]
     cuenta = actual.model_copy(update=_datos(e, nombre) | {"inicial": inicial})
@@ -327,7 +331,12 @@ def obtener_pago(usuario_id: int, id: int) -> Pago | None:
 
 
 def _validar_pago(usuario_id: int, tarjeta: Cuenta, e: PagoEntrada, pago_id: int | None) -> tuple[Cuenta, Decimal]:
-    """Devuelve la cuenta de origen y el monto normalizado, o lanza ErrorValidacion."""
+    """Devuelve la cuenta de origen y el monto normalizado, o lanza ErrorValidacion.
+
+    Un pago con fecha anterior a la creación de una cuenta no la afecta (regla de creada_en), así
+    que la deuda o el saldo solo se revisan en las cuentas que el pago sí mueve. Al editar, la
+    fecha se compara con la creación solo si cambió: un pago que pasó a una tarjeta más nueva
+    (al eliminar la suya) se puede seguir editando."""
     from app.services import movimientos
     errores: dict[str, str] = {}
     monto = None
@@ -343,16 +352,18 @@ def _validar_pago(usuario_id: int, tarjeta: Cuenta, e: PagoEntrada, pago_id: int
         errores["cuenta_origen_id"] = "Elige de qué cuenta sale el pago."
         origen = None
 
+    anterior = _pagos.get(pago_id) if pago_id is not None else None
+    fecha_nueva = anterior is None or e.fecha != anterior.fecha
     if e.fecha > _hoy():
         errores["fecha"] = "La fecha no puede ser futura."
-    elif e.fecha < tarjeta.creada_en or (origen and e.fecha < origen.creada_en):
+    elif fecha_nueva and (e.fecha < tarjeta.creada_en or (origen and e.fecha < origen.creada_en)):
         errores["fecha"] = "La fecha es anterior a la creación de la cuenta."
 
     if monto is not None:
         saldos = _saldos(usuario_id, [tarjeta, *([origen] if origen else [])], sin_pago=pago_id)
-        if monto > saldos[tarjeta.id]:
+        if e.fecha >= tarjeta.creada_en and monto > saldos[tarjeta.id]:
             errores["monto"] = f"No puedes pagar más de lo que debes ({dinero(saldos[tarjeta.id])})."
-        elif origen and monto > saldos[origen.id]:
+        elif origen and e.fecha >= origen.creada_en and monto > saldos[origen.id]:
             errores["cuenta_origen_id"] = f"No te alcanza: {origen.nombre} tiene {dinero(saldos[origen.id])}."
     if errores:
         raise ErrorValidacion(errores)

@@ -44,12 +44,14 @@ class Cuenta(BaseModel):
 
 class CuentaEntrada(BaseModel):
     """Cuerpo de crear y editar. "saldo" es el saldo (o la deuda) de HOY: al editar, cambiarlo
-    corrige el punto de partida. Las reglas las valida el servicio."""
+    corrige el punto de partida. Al editar, null (o sin saldo) deja el saldo como está: así un
+    movimiento registrado mientras el diálogo estaba abierto no se pierde al renombrar. Las reglas
+    las valida el servicio."""
     nombre: str
     tipo: TipoCuenta
     icono: Icono
     tono: Tono
-    saldo: Decimal
+    saldo: Decimal | None = None
     cupo: Decimal | None = None
     dia_pago: int | None = None
 

@@ -140,6 +140,7 @@ Boceto: la parte de abajo de `cuentas-pantalla.html`.
 - **Movimientos:** no se bloquean por falta de saldo. Una cuenta de dinero puede quedar en negativo si la persona registra un gasto mayor a su saldo, y una tarjeta puede pasar su cupo. Se muestra, pero no se impide (propuesta).
 - **Eliminar una cuenta sin movimientos ni pagos:** se elimina directamente.
 - **Eliminar una cuenta con movimientos o pagos (propuesta, igual que en Categorías):** primero hay que pasar todo a otra cuenta del mismo grupo (dinero a dinero, tarjeta a tarjeta). Los pagos también se pasan: los de una tarjeta a la otra tarjeta, y los de una cuenta de origen a la otra cuenta.
+- **Movimientos y pagos pasados a una cuenta más nueva** (decisión técnica, después de la revisión final): los que tienen fecha anterior a la `creada_en` de la cuenta destino se ven en su lista, pero no cambian su saldo, por la misma regla de `creada_en`. Un pago así se puede seguir editando: la deuda o el saldo solo se revisan en las cuentas que el pago sí mueve, y la fecha contra la creación solo si cambia.
 - **Si es la única cuenta de su grupo y tiene movimientos o pagos** (decisión técnica), no se deja eliminar: "Es tu única tarjeta. Crea otra para pasarle sus movimientos antes de eliminarla." (o "tu única cuenta de dinero"). Nunca se borran movimientos al eliminar una cuenta.
 - **Cuentas de prueba del usuario demo (decisión técnica):**
   - La plantilla mensual de `services/movimientos.py` **no cambia**, para que Movimientos, Categorías y la IA den las mismas cifras de hoy.
