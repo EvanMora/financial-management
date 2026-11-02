@@ -15,6 +15,8 @@ from typing import Literal
 
 from pydantic import BaseModel
 
+from app.schemas.movimientos import CuentaRef
+
 TipoCuenta = Literal["ahorros", "corriente", "billetera", "efectivo", "tarjeta"]
 Icono = Literal["banco", "alcancia", "billetera", "celular", "billetes", "tarjeta", "monedas", "maletin"]
 Tono = Literal["azul", "indigo", "violeta", "ciruela", "petroleo", "cafe", "arena", "grafito"]
@@ -67,3 +69,22 @@ class PanelCuentas(BaseModel):
     tienes: Decimal                 # suma de los saldos de dinero
     debes: Decimal                  # suma de las deudas
     te_queda: Decimal               # tienes − debes
+
+
+class PagoEntrada(BaseModel):
+    """Cuerpo de registrar y editar un pago de tarjeta. La tarjeta va en la URL."""
+    monto: Decimal
+    cuenta_origen_id: int
+    fecha: date
+
+
+class Pago(BaseModel):
+    """Un pago de tarjeta: plata que pasa de una cuenta de dinero a la tarjeta. No es un gasto ni
+    un ingreso (la compra ya se contó al pagar con la tarjeta)."""
+    id: int
+    fecha: date
+    monto: Decimal
+    tarjeta: CuentaRef
+    origen: CuentaRef
+    tarjeta_icono: Icono
+    tarjeta_tono: Tono

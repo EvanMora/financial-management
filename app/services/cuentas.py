@@ -5,6 +5,8 @@ Saldos (ver docs/superpowers/specs/2026-11-02-cuentas-design.md):
 - Tarjeta: la deuda es inicial + gastos − ingresos (un ingreso a una tarjeta es una devolución).
   Disponible = cupo − deuda.
 - Editar el "saldo de hoy" ajusta inicial en la diferencia: no es un movimiento.
+- Pagos de tarjeta: bajan la deuda de la tarjeta y el saldo de la cuenta de origen (cada uno desde
+  su creada_en). No son movimientos: no suman en ingresos ni gastos en ningún lado.
 
 Reglas: nombre obligatorio, de hasta MAX_NOMBRE caracteres y único entre las cuentas de la persona
 (sin tildes ni mayúsculas); una cuenta con movimientos no pasa de dinero a tarjeta ni al revés;
@@ -22,12 +24,14 @@ services/movimientos.py importa este módulo. Las funciones de aquí que necesit
 lo importan adentro para no formar un ciclo (igual que services/categorias.py).
 """
 from calendar import monthrange
+from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
 
-from app.schemas.cuentas import Cuenta, CuentaConSaldo, CuentaEntrada, PanelCuentas
-from app.schemas.movimientos import CuentaRef, Movimiento
+from app.schemas.cuentas import Cuenta, CuentaConSaldo, CuentaEntrada, Pago, PagoEntrada, PanelCuentas
+from app.schemas.movimientos import CuentaRef, FiltrosMovimientos, Movimiento
 from app.services.comun import ErrorValidacion, NoEncontrado, normalizar
+from app.web.formato import dinero
 
 MAX_NOMBRE = 40
 MAX_CUENTAS = 30  # por usuario
@@ -45,17 +49,32 @@ _DEMO = [
 _PLANTILLA = {"Cuenta de ahorros": 1, "Billetera digital": 2, "Efectivo": 3}
 _PRIMER_ID = 100
 
+
+
+@dataclass
+class _PagoGuardado:
+    usuario_id: int
+    tarjeta_id: int
+    origen_id: int
+    monto: Decimal
+    fecha: date
+
+
 _cuentas: dict[int, tuple[int, Cuenta]] = {}  # id → (usuario_id, cuenta)
+_pagos: dict[int, _PagoGuardado] = {}
 _demo_creado = False
 _siguiente_id = _PRIMER_ID
+_siguiente_pago = 1
 
 
 def reiniciar() -> None:
     """Vuelve al estado inicial (el demo se crea de nuevo al pedirlo). Solo para tests."""
-    global _demo_creado, _siguiente_id
+    global _demo_creado, _siguiente_id, _siguiente_pago
     _cuentas.clear()
+    _pagos.clear()
     _demo_creado = False
     _siguiente_id = _PRIMER_ID
+    _siguiente_pago = 1
 
 
 def es_tarjeta(tipo: str) -> bool:
@@ -126,7 +145,13 @@ def _efecto(c: Cuenta, m: Movimiento) -> Decimal:
     return -suma if es_tarjeta(c.tipo) else suma
 
 
-def _saldos(usuario_id: int, lista: list[Cuenta]) -> dict[int, Decimal]:
+def _pagos_de(usuario_id: int) -> list[tuple[int, _PagoGuardado]]:
+    return [(id, p) for id, p in _pagos.items() if p.usuario_id == usuario_id]
+
+
+def _saldos(usuario_id: int, lista: list[Cuenta], sin_pago: int | None = None) -> dict[int, Decimal]:
+    """Saldo (dinero) o deuda (tarjeta) de hoy de cada cuenta. sin_pago deja fuera un pago: el que
+    se está editando, para no contar su monto anterior."""
     from app.services import movimientos
     if not lista:
         return {}
@@ -137,20 +162,36 @@ def _saldos(usuario_id: int, lista: list[Cuenta]) -> dict[int, Decimal]:
         c = por_id.get(m.cuenta.id)
         if c and m.fecha >= c.creada_en:
             saldos[c.id] += _efecto(c, m)
+    for id, p in _pagos_de(usuario_id):
+        if id == sin_pago:
+            continue
+        for cuenta_id in (p.tarjeta_id, p.origen_id):  # baja la deuda de una y el saldo de la otra
+            c = por_id.get(cuenta_id)
+            if c and p.fecha >= c.creada_en:
+                saldos[c.id] -= p.monto
     return saldos
+
+
+def _usos_por_cuenta(usuario_id: int) -> dict[int, int]:
+    """Movimientos (de los meses ya sembrados) y pagos de cada cuenta."""
+    from app.services import movimientos
+    usos = movimientos.usos_por_cuenta(usuario_id)
+    for _, p in _pagos_de(usuario_id):
+        for cuenta_id in (p.tarjeta_id, p.origen_id):
+            usos[cuenta_id] = usos.get(cuenta_id, 0) + 1
+    return usos
 
 
 def _usos(usuario_id: int, c: Cuenta) -> int:
     from app.services import movimientos
     movimientos.desde(usuario_id, c.creada_en)  # siembra los meses que importan antes de contar
-    return movimientos.usos_por_cuenta(usuario_id).get(c.id, 0)
+    return _usos_por_cuenta(usuario_id).get(c.id, 0)
 
 
 def panel(usuario_id: int) -> PanelCuentas:
-    from app.services import movimientos
     lista = listar(usuario_id)
     saldos = _saldos(usuario_id, lista)
-    usos = movimientos.usos_por_cuenta(usuario_id)  # _saldos ya sembró desde la cuenta más vieja
+    usos = _usos_por_cuenta(usuario_id)  # _saldos ya sembró desde la cuenta más vieja
     hoy = _hoy()
     dinero, tarjetas = [], []
     for c in lista:
@@ -263,4 +304,116 @@ def eliminar(usuario_id: int, id: int, mover_a: int | None = None) -> None:
         if es_tarjeta(destino.tipo) != tarjeta:
             raise ErrorValidacion({"mover_a": "Elige una tarjeta." if tarjeta else "Elige una cuenta de dinero."})
         movimientos.cambiar_cuenta(usuario_id, id, ref(destino))
+        for _, p in _pagos_de(usuario_id):
+            if p.tarjeta_id == id:
+                p.tarjeta_id = destino.id
+            if p.origen_id == id:
+                p.origen_id = destino.id
     del _cuentas[id]
+
+
+# ---------- Pagos de tarjeta ----------
+
+def _leer_pago(id: int, p: _PagoGuardado) -> Pago:
+    tarjeta = obtener(p.usuario_id, p.tarjeta_id)
+    origen = obtener(p.usuario_id, p.origen_id)
+    return Pago(id=id, fecha=p.fecha, monto=p.monto, tarjeta=ref(tarjeta), origen=ref(origen),
+                tarjeta_icono=tarjeta.icono, tarjeta_tono=tarjeta.tono)
+
+
+def obtener_pago(usuario_id: int, id: int) -> Pago | None:
+    p = _pagos.get(id)
+    return _leer_pago(id, p) if p and p.usuario_id == usuario_id else None
+
+
+def _validar_pago(usuario_id: int, tarjeta: Cuenta, e: PagoEntrada, pago_id: int | None) -> tuple[Cuenta, Decimal]:
+    """Devuelve la cuenta de origen y el monto normalizado, o lanza ErrorValidacion."""
+    from app.services import movimientos
+    errores: dict[str, str] = {}
+    monto = None
+    if not e.monto.is_finite() or e.monto <= 0:
+        errores["monto"] = "Escribe un monto mayor que 0."
+    elif e.monto >= movimientos.MAX_MONTO:
+        errores["monto"] = "El monto es demasiado grande."
+    else:
+        monto = movimientos._normalizar_monto(e.monto)
+
+    origen = obtener(usuario_id, e.cuenta_origen_id)
+    if origen is None or es_tarjeta(origen.tipo):
+        errores["cuenta_origen_id"] = "Elige de qué cuenta sale el pago."
+        origen = None
+
+    if e.fecha > _hoy():
+        errores["fecha"] = "La fecha no puede ser futura."
+    elif e.fecha < tarjeta.creada_en or (origen and e.fecha < origen.creada_en):
+        errores["fecha"] = "La fecha es anterior a la creación de la cuenta."
+
+    if monto is not None:
+        saldos = _saldos(usuario_id, [tarjeta, *([origen] if origen else [])], sin_pago=pago_id)
+        if monto > saldos[tarjeta.id]:
+            errores["monto"] = f"No puedes pagar más de lo que debes ({dinero(saldos[tarjeta.id])})."
+        elif origen and monto > saldos[origen.id]:
+            errores["cuenta_origen_id"] = f"No te alcanza: {origen.nombre} tiene {dinero(saldos[origen.id])}."
+    if errores:
+        raise ErrorValidacion(errores)
+    return origen, monto
+
+
+def _tarjeta(usuario_id: int, id: int) -> Cuenta:
+    tarjeta = obtener(usuario_id, id)
+    if tarjeta is None:
+        raise NoEncontrado(id)
+    if not es_tarjeta(tarjeta.tipo):
+        raise ErrorValidacion({"general": "Solo se le pueden registrar pagos a una tarjeta."})
+    return tarjeta
+
+
+def registrar_pago(usuario_id: int, tarjeta_id: int, e: PagoEntrada) -> Pago:
+    # TODO(backend): INSERT en PagoTarjeta con usuario_id.
+    global _siguiente_pago
+    tarjeta = _tarjeta(usuario_id, tarjeta_id)
+    origen, monto = _validar_pago(usuario_id, tarjeta, e, None)
+    id = _siguiente_pago
+    _siguiente_pago += 1
+    _pagos[id] = _PagoGuardado(usuario_id, tarjeta.id, origen.id, monto, e.fecha)
+    return _leer_pago(id, _pagos[id])
+
+
+def actualizar_pago(usuario_id: int, id: int, e: PagoEntrada) -> Pago:
+    """Cambia monto, cuenta de origen o fecha. La tarjeta no cambia."""
+    # TODO(backend): UPDATE por id y usuario_id.
+    p = _pagos.get(id)
+    if p is None or p.usuario_id != usuario_id:
+        raise NoEncontrado(id)
+    tarjeta = _tarjeta(usuario_id, p.tarjeta_id)
+    origen, monto = _validar_pago(usuario_id, tarjeta, e, id)
+    _pagos[id] = _PagoGuardado(usuario_id, tarjeta.id, origen.id, monto, e.fecha)
+    return _leer_pago(id, _pagos[id])
+
+
+def eliminar_pago(usuario_id: int, id: int) -> None:
+    # TODO(backend): DELETE por id y usuario_id.
+    p = _pagos.get(id)
+    if p is None or p.usuario_id != usuario_id:
+        raise NoEncontrado(id)
+    del _pagos[id]
+
+
+def pagos_del_mes(usuario_id: int, anio: int, mes: int, filtros: FiltrosMovimientos) -> list[Pago]:
+    """Los pagos del mes que deja ver el filtro de Movimientos, del más nuevo al más viejo. No son
+    gastos ni ingresos ni tienen categoría: con esos filtros no aparece ninguno."""
+    # TODO(backend): SELECT de PagoTarjeta del mes con los filtros.
+    if filtros.tipo or filtros.categoria_id:
+        return []
+    buscar = normalizar((filtros.q or "").strip())
+    pagos = []
+    for id, p in _pagos_de(usuario_id):
+        if (p.fecha.year, p.fecha.month) != (anio, mes):
+            continue
+        if filtros.cuenta_id and filtros.cuenta_id not in (p.tarjeta_id, p.origen_id):
+            continue
+        pago = _leer_pago(id, p)
+        if buscar and buscar not in normalizar(f"Pago {pago.tarjeta.nombre} {pago.origen.nombre}"):
+            continue
+        pagos.append(pago)
+    return sorted(pagos, key=lambda x: (x.fecha, x.id), reverse=True)
