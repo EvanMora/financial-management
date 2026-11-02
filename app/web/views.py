@@ -9,11 +9,12 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
 from app.schemas.movimientos import FiltrosMovimientos
+from app.services import categorias as categorias_servicio
 from app.services import ia as ia_servicio
 from app.services import movimientos as movimientos_servicio
 from app.services.dashboard import obtener_resumen
 from app.web import formato
-from app.web.presentacion import vista_movimientos, vista_resumen
+from app.web.presentacion import vista_categorias, vista_movimientos, vista_resumen
 from app.web.preview import build_preview
 from app.web.sesion import USUARIO_DEMO
 
@@ -168,6 +169,18 @@ def cuentas(request: Request):
 
 
 @router.get("/categorias", response_class=HTMLResponse)
-def categorias(request: Request):
-    return _seccion_pendiente(request, "categorias", "Categorías",
-                              "Aquí vas a organizar las categorías de tus ingresos y gastos.")
+def categorias(
+    request: Request,
+    anio: int | None = Query(None, ge=2000, le=2100),
+    mes: int | None = Query(None, ge=1, le=12),
+    guardado: str | None = None,
+):
+    anio, mes = _periodo(anio, mes)
+    datos = categorias_servicio.del_mes(USUARIO_DEMO["id"], anio, mes)
+    context = _contexto_app(request, "categorias") | {
+        "datos": datos,
+        "vista": vista_categorias(datos),
+        "periodo": _navegacion_mes(anio, mes),
+        "guardado": _entero(guardado),
+    }
+    return templates.TemplateResponse(request, "app/categorias.html", context)

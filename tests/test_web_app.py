@@ -80,7 +80,8 @@ def test_dialogo_en_todas_las_secciones(seccion):
     html = client.get(f"/{seccion}").text
 
     assert 'id="dialogo-movimiento"' in html
-    assert html.count('data-tipo="gasto"') == 5 and html.count('data-tipo="ingreso"') == 2
+    dialogo = html.split('id="dialogo-movimiento"', 1)[1].split("</dialog>", 1)[0]
+    assert dialogo.count('data-tipo="gasto"') == 5 and dialogo.count('data-tipo="ingreso"') == 2
     assert f'max="{date.today().isoformat()}"' in html
     assert 'maxlength="80"' in html
     assert 'data-toast' in html

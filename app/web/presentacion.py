@@ -1,9 +1,10 @@
 """Convierte los contratos en lo que necesitan las plantillas: porcentajes, alturas y anchos de
-las gráficas del Resumen, y los días agrupados de Movimientos. Aquí no se consulta nada; solo se
-hacen cuentas de presentación."""
+las gráficas del Resumen, los días agrupados de Movimientos y los grupos de Categorías. Aquí no
+se consulta nada; solo se hacen cuentas de presentación."""
 from decimal import Decimal
 from itertools import groupby
 
+from app.schemas.categorias import CategoriasDelMes
 from app.schemas.dashboard import ResumenDashboard
 from app.schemas.movimientos import ListaMovimientos, Movimiento
 
@@ -69,3 +70,26 @@ def vista_movimientos(lista: ListaMovimientos) -> dict:
         "balance": lista.ingresos - lista.gastos,
         "hay_filtros": bool(f.tipo or f.cuenta_id or f.categoria_id or (f.q or "").strip()),
     }
+
+
+def vista_categorias(datos: CategoriasDelMes) -> dict:
+    """Gastos primero (como en los filtros de Movimientos), cada fila con su parte del total del
+    grupo y lo que necesita el diálogo para editarla (va en data-categoria)."""
+    grupos = []
+    for tipo, titulo, filas, total in (("gasto", "Gastos", datos.gastos, datos.total_gastos),
+                                       ("ingreso", "Ingresos", datos.ingresos, datos.total_ingresos)):
+        grupos.append({
+            "tipo": tipo,
+            "titulo": titulo,
+            "total": total,
+            "filas": [
+                {
+                    "f": f,
+                    "pct": _pct(f.total, total),
+                    "datos": {"id": f.categoria.id, "nombre": f.categoria.nombre, "tipo": f.categoria.tipo,
+                              "usos": f.usos},
+                }
+                for f in filas
+            ],
+        })
+    return {"grupos": grupos}

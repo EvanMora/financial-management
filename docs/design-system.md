@@ -97,6 +97,14 @@ Los controles nuevos de la sección Movimientos salen de los del login. No agreg
   - **Cuentas:** sin IA, a propósito: bancos y saldos son los datos más sensibles y no hacen falta.
 - **Montos con signo**: el balance y el neto de cada día son verdes con "+" si son positivos o cero, y van en el color del texto con "−" si son negativos. Nunca rojos: el rojo queda para errores y excesos de presupuesto.
 
+## Sección Categorías
+
+- **Dos tarjetas, Gastos e Ingresos**, con lo que sumó cada categoría en el mes del selector, de mayor a menor. Cada fila dice cuántos movimientos tiene y qué parte del total del grupo es. Las que suman $0 van en gris.
+- **Cada fila es un enlace** a Movimientos filtrado por esa categoría y ese mes.
+- **Predeterminadas y propias:** las predeterminadas son iguales para todos y no se cambian. Las propias llevan un lápiz que abre el diálogo para renombrarlas o eliminarlas. Si en una tarjeta no hay propias, no se reserva el espacio del lápiz.
+- **"Nueva categoría"** es la acción principal de la pantalla: botón azul en la barra superior (en el celular, solo el "+").
+- **Diálogo:** mismos componentes que el de movimientos (segmentado Gasto/Ingreso, campo flotante, confirmación de eliminar). Si la categoría ya tiene movimientos, el tipo queda fijo con una nota, y para eliminarla hay que elegir a qué categoría del mismo tipo pasarlos ("Pasar y eliminar").
+
 ## Movimiento
 
 - Duraciones: `--duration-fast` (hover y foco), `--duration-default` (cambios de estado), `--duration-slow` (entradas de paneles).
