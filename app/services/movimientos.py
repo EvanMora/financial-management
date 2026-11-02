@@ -21,6 +21,7 @@ from app.schemas.movimientos import (
 )
 from app.services import categorias, cuentas
 from app.services.comun import ErrorValidacion, NoEncontrado  # la API los toma de aquí: servicio.ErrorValidacion
+from app.services.comun import limpiar_texto
 from app.services.comun import normalizar as _normalizar
 
 MAX_DESCRIPCION = 80
@@ -95,7 +96,7 @@ def _coincide(m: Movimiento, f: FiltrosMovimientos, buscar: str) -> bool:
         return False
     if f.categoria_id and m.categoria.id != f.categoria_id:
         return False
-    if buscar and buscar not in _normalizar(m.descripcion) and buscar not in _normalizar(m.categoria.nombre):
+    if buscar and not any(buscar in _normalizar(texto) for texto in (m.descripcion, m.categoria.nombre, m.cuenta.nombre)):
         return False
     return True
 
@@ -201,7 +202,7 @@ def _validar(usuario_id: int, entrada: MovimientoEntrada) -> tuple[CategoriaRef,
         errores["cuenta_id"] = "Elige una cuenta."
     if entrada.fecha > hoy():
         errores["fecha"] = "La fecha no puede ser futura."
-    descripcion = entrada.descripcion.strip()
+    descripcion = limpiar_texto(entrada.descripcion)
     if len(descripcion) > MAX_DESCRIPCION:
         errores["descripcion"] = f"Máximo {MAX_DESCRIPCION} caracteres."
     if errores:
