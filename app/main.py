@@ -36,7 +36,6 @@ app.include_router(api_cuentas.router_pagos)
 app.include_router(api_ia.router)
 
 
-
 @app.get("/", include_in_schema=False)
 def inicio():
     """La raíz lleva al Resumen. TODO(backend): con el login real, a /login si no hay sesión."""
