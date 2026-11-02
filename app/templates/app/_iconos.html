@@ -1,0 +1,25 @@
+{# Íconos de trazo de la app. Todos usan currentColor y heredan el grosor de su contenedor. #}
+{% macro seccion(nombre) -%}
+<svg viewBox="0 0 20 20" aria-hidden="true">
+  {%- if nombre == "resumen" -%}<rect x="3" y="3" width="6" height="7" rx="2"/><rect x="11" y="3" width="6" height="4" rx="2"/><rect x="11" y="9" width="6" height="8" rx="2"/><rect x="3" y="12" width="6" height="5" rx="2"/>
+  {%- elif nombre == "movimientos" -%}<path d="M4 7h10l-3-3M16 13H6l3 3"/>
+  {%- elif nombre == "cuentas" -%}<rect x="2.5" y="5" width="15" height="11" rx="3"/><path d="M2.5 9h15M6 13h3"/>
+  {%- elif nombre == "categorias" -%}<path d="M10.5 3H16a1 1 0 0 1 1 1v5.5L9.5 17 3 10.5z"/><circle cx="13.5" cy="6.5" r="1.2"/>
+  {%- elif nombre == "presupuestos" -%}<circle cx="10" cy="10" r="7"/><path d="M10 3v7l5 4"/>
+  {%- elif nombre == "metas" -%}<circle cx="10" cy="10" r="7"/><circle cx="10" cy="10" r="3.5"/><circle cx="10" cy="10" r=".6"/>
+  {%- endif -%}
+</svg>
+{%- endmacro %}
+
+{# Ícono de cada categoría por defecto; las categorías nuevas usan la etiqueta genérica. #}
+{% macro categoria(nombre) -%}
+<svg viewBox="0 0 16 16" aria-hidden="true">
+  {%- if nombre == "Salario" -%}<path d="M8 2.5v8M4.5 7L8 10.5 11.5 7M3 13.5h10"/>
+  {%- elif nombre == "Arriendo" -%}<path d="M2.5 7.5L8 3l5.5 4.5M4 6.5V13h8V6.5"/>
+  {%- elif nombre == "Mercado" -%}<path d="M2 3h2l1.5 7h7L14 5H5"/><circle cx="6.5" cy="13" r="1"/><circle cx="11.5" cy="13" r="1"/>
+  {%- elif nombre == "Transporte" -%}<rect x="3" y="2.5" width="10" height="9" rx="2"/><path d="M3 7.5h10M5 11.5v2M11 11.5v2"/>
+  {%- elif nombre == "Ocio" -%}<rect x="2" y="4" width="12" height="8" rx="2"/><path d="M6.5 6.5v3l2.5-1.5z"/>
+  {%- else -%}<path d="M8.5 2.5H13a.5.5 0 0 1 .5.5v4.5L7.5 13.5 2.5 8.5z"/><circle cx="10.8" cy="5.2" r=".9"/>
+  {%- endif -%}
+</svg>
+{%- endmacro %}

@@ -1,0 +1,648 @@
+/*
+ * Estructura de la app (barra lateral + barra superior) y componentes compartidos por las
+ * secciones. Solo usa variables de tokens.css; las reglas están en docs/design-system.md.
+ */
+
+/* ---------- Cambio de sección ----------
+ * Cada sección es una página propia. El navegador anima el paso entre ellas (View Transitions):
+ * la barra lateral se queda quieta, la píldora de la sección activa se desliza y el contenido
+ * viejo se desvanece mientras el nuevo entra con sus bloques escalonados.
+ * En navegadores sin soporte (Firefox) la página cambia sin animación.
+ */
+@view-transition {
+  navigation: auto;
+}
+
+.sidebar {
+  view-transition-name: barra;
+}
+
+.sb-indicator {
+  view-transition-name: indicador;
+}
+
+.main {
+  view-transition-name: contenido;
+}
+
+::view-transition-group(indicador) {
+  animation-duration: 320ms;
+  animation-timing-function: cubic-bezier(0.2, 0, 0, 1);
+}
+
+::view-transition-old(contenido) {
+  animation: vt-fuera 120ms cubic-bezier(0, 0, 0.2, 1) both;
+}
+
+/* El contenido nuevo aparece de una vez; sus bloques hacen su propia entrada (view-in). */
+::view-transition-new(contenido) {
+  animation: none;
+}
+
+@keyframes vt-fuera {
+  to {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+/* ---------- Estructura ---------- */
+.shell {
+  --sb-w: 248px;
+  display: grid;
+  grid-template-columns: var(--sb-w) minmax(0, 1fr);
+  min-height: 100vh;
+  min-height: 100dvh;
+  font-size: var(--text-small);
+  letter-spacing: var(--tracking-small);
+  transition: grid-template-columns var(--duration-slow) var(--ease-emphasized);
+}
+
+.shell.is-collapsed {
+  --sb-w: 76px;
+}
+
+/* ---------- Barra lateral ---------- */
+.sidebar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-20);
+  height: 100vh;
+  height: 100dvh;
+  min-width: 0;
+  padding: var(--space-20) var(--space-16);
+  overflow: hidden;
+  background: var(--color-surface);
+  box-shadow: inset -1px 0 0 var(--color-fill-muted);
+}
+
+.sb-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-12);
+  height: 36px;
+  padding: 0 10px;
+  color: var(--color-text);
+  font-family: var(--font-display);
+  font-size: var(--text-body);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0;
+  white-space: nowrap;
+}
+
+.sb-head:hover {
+  text-decoration: none;
+}
+
+.sb-head svg {
+  width: 24px;
+  height: 24px;
+  flex: none;
+}
+
+.sb-label {
+  overflow: hidden;
+  white-space: nowrap;
+  transition: opacity var(--duration-default) var(--ease-out);
+}
+
+.is-collapsed .sb-label,
+.is-collapsed .sb-group {
+  opacity: 0;
+}
+
+.sb-new {
+  justify-content: flex-start;
+  gap: var(--space-12);
+  width: 100%;
+  height: 40px;
+  padding: 0 14px;
+  font-size: var(--text-small);
+  font-weight: var(--weight-medium);
+  white-space: nowrap;
+}
+
+.sb-new svg,
+.sb-item svg,
+.sb-toggle svg,
+.topbar__menu svg,
+.month svg,
+.pending__icon svg {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.sb-item svg {
+  width: 20px;
+  height: 20px;
+}
+
+.sb-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sb-nav li {
+  position: relative;
+}
+
+/* Píldora gris de la sección activa. Entre páginas se desliza (view-transition-name: indicador). */
+.sb-indicator {
+  position: absolute;
+  inset: 0;
+  background: var(--color-canvas);
+  border-radius: var(--radius-pill);
+}
+
+.sb-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-12);
+  height: 40px;
+  padding: 0 14px;
+  color: var(--color-text-secondary);
+  border-radius: var(--radius-pill);
+  white-space: nowrap;
+  transition: color var(--duration-fast) var(--ease-out);
+}
+
+.sb-item:hover {
+  color: var(--color-text);
+  text-decoration: none;
+}
+
+.sb-item[aria-current="page"] {
+  color: var(--color-text);
+  font-weight: var(--weight-medium);
+}
+
+.sb-item[aria-disabled="true"] {
+  color: var(--color-border-strong);
+  cursor: default;
+}
+
+.sb-soon {
+  margin-left: auto;
+  padding: 1px 8px;
+  background: var(--color-canvas);
+  border-radius: var(--radius-pill);
+  color: var(--color-text-secondary);
+  font-size: 11px;
+  font-weight: var(--weight-medium);
+}
+
+.sb-group {
+  padding: var(--space-12) 14px 4px;
+  color: var(--color-text-secondary);
+  font-size: var(--text-caption);
+  white-space: nowrap;
+  transition: opacity var(--duration-default) var(--ease-out);
+}
+
+.sb-foot {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: auto;
+  padding-top: var(--space-12);
+  box-shadow: 0 -1px 0 var(--color-fill-muted);
+}
+
+.sb-user {
+  display: flex;
+  align-items: center;
+  gap: var(--space-12);
+  padding: 6px;
+  white-space: nowrap;
+}
+
+.sb-toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-12);
+  height: 40px;
+  padding: 0 14px;
+  border: 0;
+  background: none;
+  color: var(--color-text-secondary);
+  border-radius: var(--radius-pill);
+  font: inherit;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.sb-toggle:hover {
+  background: var(--color-canvas);
+  color: var(--color-text);
+}
+
+.sb-toggle svg {
+  transition: transform var(--duration-slow) var(--ease-emphasized);
+}
+
+.is-collapsed .sb-toggle svg {
+  transform: scaleX(-1);
+}
+
+.avatar {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  flex: none;
+  background: var(--color-fill-muted);
+  border-radius: var(--radius-pill);
+  font-size: 11px;
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0;
+}
+
+/* ---------- Barra superior ---------- */
+.main {
+  min-width: 0;
+}
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: var(--space-16);
+  height: 72px;
+  padding: 0 var(--space-40);
+  background: var(--nav-bg);
+  -webkit-backdrop-filter: var(--nav-backdrop);
+  backdrop-filter: var(--nav-backdrop);
+}
+
+.topbar__title {
+  font-size: var(--text-heading);
+  line-height: var(--leading-heading);
+}
+
+.topbar__end {
+  display: flex;
+  align-items: center;
+  gap: var(--space-12);
+  margin-left: auto;
+}
+
+.topbar__menu {
+  display: none;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  margin-left: -10px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-text);
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+}
+
+.topbar__menu svg {
+  width: 20px;
+  height: 20px;
+}
+
+/* Selector de mes: píldora ‹ mes › */
+.month {
+  display: inline-flex;
+  align-items: center;
+  height: 36px;
+  background: var(--color-surface);
+  border-radius: var(--radius-pill);
+  box-shadow: inset 0 0 0 1px var(--color-border-strong);
+}
+
+.month a,
+.month__off {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  color: var(--color-text);
+  border-radius: var(--radius-pill);
+}
+
+.month a:hover {
+  background: var(--color-canvas);
+}
+
+.month__off {
+  color: var(--color-border-strong);
+}
+
+.month svg {
+  width: 12px;
+  height: 12px;
+  stroke-width: 1.8;
+}
+
+.month > span[aria-current] {
+  min-width: 112px;
+  text-align: center;
+  font-weight: var(--weight-medium);
+  white-space: nowrap;
+}
+
+.m-short {
+  display: none;
+}
+
+/* ---------- Contenido ---------- */
+.view {
+  display: block;
+  padding: var(--space-8) var(--space-40) var(--space-48);
+}
+
+/* Entrada de cada sección: los bloques suben y aparecen escalonados (style="--i: n"). */
+.view > * {
+  animation: view-in var(--duration-slow) var(--ease-emphasized) both;
+  animation-delay: calc(var(--i, 0) * 70ms);
+}
+
+@keyframes view-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+
+/* ---------- Componentes compartidos por las secciones ---------- */
+.label {
+  color: var(--color-text-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--leading-caption);
+  letter-spacing: var(--tracking-caption);
+}
+
+.card-title {
+  font-family: var(--font-display);
+  font-size: var(--text-title);
+  line-height: var(--leading-title);
+  letter-spacing: var(--tracking-title);
+  font-weight: var(--weight-semibold);
+}
+
+/* Cifra principal: números proporcionales (sin .num), como dice la sección Números. */
+.big {
+  font-family: var(--font-display);
+  font-size: var(--text-display);
+  line-height: var(--leading-display);
+  font-weight: var(--weight-semibold);
+  letter-spacing: -0.4px;
+  white-space: nowrap;
+}
+
+.mid {
+  font-family: var(--font-display);
+  font-size: var(--text-title);
+  line-height: var(--leading-title);
+  font-weight: var(--weight-semibold);
+  white-space: nowrap;
+}
+
+.income {
+  color: var(--color-income);
+}
+
+.sub {
+  display: block;
+  color: var(--color-text-secondary);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-regular);
+  letter-spacing: var(--tracking-caption);
+}
+
+.link-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--text-caption);
+  letter-spacing: var(--tracking-caption);
+}
+
+.card {
+  padding: var(--card-padding);
+  background: var(--color-canvas);
+  border-radius: var(--radius-card);
+}
+
+.card-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-12);
+  margin-bottom: var(--space-20);
+}
+
+/* Filas de lista: ícono, nombre con detalle y monto alineado a la derecha. */
+.rows {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.rows li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-12);
+  padding: var(--space-12) 0;
+  border-top: 1px solid var(--color-fill-muted);
+}
+
+.rows li:first-child {
+  border-top: 0;
+}
+
+.rows .num {
+  white-space: nowrap;
+}
+
+.rows__name {
+  display: flex;
+  align-items: center;
+  gap: var(--space-12);
+  min-width: 0;
+}
+
+.icon-bubble {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  flex: none;
+  background: var(--color-surface);
+  border-radius: var(--radius-pill);
+}
+
+.icon-bubble svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: var(--color-text);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* Sección todavía sin contenido. */
+.pending {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-12);
+  padding: var(--space-64) var(--space-28);
+  background: var(--color-canvas);
+  border-radius: var(--radius-card);
+  text-align: center;
+}
+
+.pending p {
+  max-width: 420px;
+  color: var(--color-text-secondary);
+}
+
+.pending .btn {
+  margin-top: var(--space-8);
+}
+
+.pending__icon {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  margin-bottom: var(--space-4);
+  background: var(--color-text);
+  color: var(--color-on-primary);
+  border-radius: 16px;
+}
+
+.pending__icon svg {
+  width: 26px;
+  height: 26px;
+}
+
+/* ---------- Celular: la barra lateral se vuelve un cajón de vidrio ---------- */
+.scrim {
+  display: none;
+}
+
+@media (max-width: 760px) {
+  .shell,
+  .shell.is-collapsed {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* Flota sobre el contenido: por eso es el único lugar de la app con vidrio. */
+  .sidebar {
+    position: fixed;
+    top: var(--space-8);
+    bottom: var(--space-8);
+    left: var(--space-8);
+    width: 272px;
+    height: auto;
+    background: rgba(255, 255, 255, 0.86);
+    -webkit-backdrop-filter: var(--glass-blur);
+    backdrop-filter: var(--glass-blur);
+    border-radius: var(--radius-card);
+    box-shadow: var(--glass-edge);
+    transform: translateX(calc(-100% - var(--space-16)));
+    visibility: hidden;
+    transition: transform var(--duration-slow) var(--ease-emphasized), visibility 0s linear var(--duration-slow);
+  }
+
+  .is-collapsed .sb-label,
+  .is-collapsed .sb-group {
+    opacity: 1;
+  }
+
+  .shell.is-open .sidebar {
+    transform: none;
+    visibility: visible;
+    transition: transform var(--duration-slow) var(--ease-emphasized);
+  }
+
+  .scrim {
+    position: fixed;
+    inset: 0;
+    z-index: 15;
+    display: block;
+    visibility: hidden;
+    background: rgba(29, 29, 31, 0.18);
+    opacity: 0;
+    transition: opacity var(--duration-slow) var(--ease-out), visibility 0s linear var(--duration-slow);
+  }
+
+  .shell.is-open .scrim {
+    visibility: visible;
+    opacity: 1;
+    transition: opacity var(--duration-slow) var(--ease-out);
+  }
+
+  .sb-toggle {
+    display: none;
+  }
+
+  .topbar {
+    height: 60px;
+    padding: 0 var(--space-20);
+  }
+
+  .topbar__title {
+    font-size: var(--text-title);
+    line-height: var(--leading-title);
+  }
+
+  .topbar__menu {
+    display: grid;
+  }
+
+  .month > span[aria-current] {
+    min-width: 0;
+    padding: 0 2px;
+  }
+
+  .m-long {
+    display: none;
+  }
+
+  .m-short {
+    display: inline;
+  }
+
+  .view {
+    padding: var(--space-8) var(--space-16) var(--space-32);
+  }
+}
+
+/* ---------- Movimiento reducido: todo cambia al instante ---------- */
+@media (prefers-reduced-motion: reduce) {
+  @view-transition {
+    navigation: none;
+  }
+
+  .shell,
+  .shell *,
+  .scrim {
+    animation: none !important;
+    transition: none !important;
+  }
+}

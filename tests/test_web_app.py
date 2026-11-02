@@ -1,0 +1,74 @@
+"""Estructura de la app: barra lateral, secciones y pantalla de Resumen."""
+from datetime import date
+
+import pytest
+from fastapi.testclient import TestClient
+
+from app.main import app
+from app.web.formato import nombre_mes
+
+client = TestClient(app)
+
+SECCIONES = ["resumen", "movimientos", "cuentas", "categorias"]
+
+
+@pytest.mark.parametrize("seccion", SECCIONES)
+def test_cada_seccion_responde_y_marca_su_item(seccion):
+    response = client.get(f"/{seccion}")
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/html")
+    assert f'href="/{seccion}" title' in response.text
+    assert response.text.count('aria-current="page"') == 1
+    activo = response.text.split('aria-current="page"')[0].rsplit("<a", 1)[1]
+    assert f'href="/{seccion}"' in activo
+
+
+def test_barra_contraida_se_recuerda_con_cookie():
+    abierta = TestClient(app).get("/resumen").text
+    contraida_client = TestClient(app)
+    contraida_client.cookies.set("barra_contraida", "1")
+    contraida = contraida_client.get("/resumen").text
+
+    assert 'class="shell" data-shell' in abierta
+    assert 'class="shell is-collapsed" data-shell' in contraida
+    assert 'aria-expanded="false"' in contraida
+
+
+def test_resumen_muestra_las_cifras_del_contrato():
+    html = client.get("/resumen?anio=2026&mes=10").text
+
+    assert "$4.382.900" in html
+    assert "+$3.200.000" in html
+    assert "−$1.874.300" in html
+    assert "Te quedan <strong class=\"num\">$1.325.700</strong>" in html
+    assert 'role="img"' in html and 'aria-label="Ingresos $3.200.000, gastos $1.874.300"' in html
+    assert "Octubre 2026" in html
+
+
+def test_selector_de_mes():
+    html = client.get("/resumen?anio=2026&mes=1").text
+
+    assert 'href="/resumen?anio=2025&amp;mes=12"' in html
+    assert 'href="/resumen?anio=2026&amp;mes=2"' in html
+
+
+def test_no_deja_ir_a_meses_futuros():
+    hoy = date.today()
+    html = client.get(f"/resumen?anio={hoy.year + 1}&mes=1").text
+
+    assert f"{nombre_mes(hoy.month).capitalize()} {hoy.year}" in html
+    assert "month__off" in html  # la flecha "siguiente" está desactivada en el mes actual
+
+
+def test_mes_invalido():
+    assert client.get("/resumen?anio=2026&mes=13").status_code == 422
+
+
+def test_login_redirige_al_resumen():
+    assert 'data-redirect="/resumen"' in client.get("/login").text
+
+
+def test_archivos_de_la_app():
+    for path in ("/static/css/app.css", "/static/css/resumen.css", "/static/js/app-shell.js"):
+        assert client.get(path).status_code == 200, path
