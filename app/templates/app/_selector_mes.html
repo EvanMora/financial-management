@@ -1,7 +1,8 @@
-{# Píldora ‹ mes ›. La flecha siguiente se desactiva en el mes actual. Espera "periodo" y "ruta". #}
+{# Píldora ‹ mes ›. La flecha siguiente se desactiva en el mes actual. Espera "periodo" y "ruta";
+   "consulta" (opcional) son otros parámetros de la URL que se conservan al cambiar de mes. #}
 {% set ant_anio, ant_mes = periodo.anterior %}
 <nav class="month" aria-label="Mes">
-  <a href="/{{ ruta }}?anio={{ ant_anio }}&amp;mes={{ ant_mes }}" aria-label="Mes anterior: {{ ant_mes | nombre_mes }} {{ ant_anio }}">
+  <a href="/{{ ruta }}?anio={{ ant_anio }}&amp;mes={{ ant_mes }}{% if consulta %}&amp;{{ consulta }}{% endif %}" aria-label="Mes anterior: {{ ant_mes | nombre_mes }} {{ ant_anio }}">
     <svg viewBox="0 0 12 12" aria-hidden="true"><path d="M7.5 2.5L4 6l3.5 3.5"/></svg>
   </a>
   <span aria-current="date">
@@ -10,7 +11,7 @@
   </span>
   {% if periodo.siguiente %}
   {% set sig_anio, sig_mes = periodo.siguiente %}
-  <a href="/{{ ruta }}?anio={{ sig_anio }}&amp;mes={{ sig_mes }}" aria-label="Mes siguiente: {{ sig_mes | nombre_mes }} {{ sig_anio }}">
+  <a href="/{{ ruta }}?anio={{ sig_anio }}&amp;mes={{ sig_mes }}{% if consulta %}&amp;{{ consulta }}{% endif %}" aria-label="Mes siguiente: {{ sig_mes | nombre_mes }} {{ sig_anio }}">
     <svg viewBox="0 0 12 12" aria-hidden="true"><path d="M4.5 2.5L8 6l-3.5 3.5"/></svg>
   </a>
   {% else %}

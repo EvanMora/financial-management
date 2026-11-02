@@ -84,8 +84,8 @@
       {% for m in resumen.movimientos_recientes %}
       <li>
         <span class="rows__name">
-          <span class="icon-bubble">{{ iconos.categoria(m.categoria) }}</span>
-          <span>{{ m.descripcion }}<span class="sub">{{ m.fecha | fecha_corta }} · {{ m.cuenta }}</span></span>
+          <span class="icon-bubble">{{ iconos.categoria(m.categoria.nombre) }}</span>
+          <span>{{ m.descripcion or m.categoria.nombre }}<span class="sub">{{ m.fecha | fecha_corta }} · {{ m.cuenta.nombre }}</span></span>
         </span>
         {% if m.tipo == "ingreso" %}
         <span class="num income">{{ m.monto | dinero("+") }}</span>

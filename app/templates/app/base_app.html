@@ -9,6 +9,8 @@
 {% block title %}{% block titulo %}{% endblock %} · {{ app_name }}{% endblock %}
 
 {% block head %}
+{# Antes de pintar: los estilos saben que hay JS (p. ej. ocultan el botón "Filtrar"). #}
+<script>document.documentElement.classList.add("js");</script>
 <link rel="stylesheet" href="{{ url_for('static', path='css/app.css') }}">
 {% block estilos %}{% endblock %}
 {% endblock %}
@@ -26,7 +28,7 @@
       <span class="sb-label">{{ app_name }}</span>
     </a>
 
-    <a class="btn btn--ink sb-new" href="/movimientos" title="Nuevo movimiento">
+    <a class="btn btn--ink sb-new" href="/movimientos?nuevo=1" title="Nuevo movimiento" data-nuevo-movimiento>
       <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3v10M3 8h10"/></svg>
       <span class="sb-label">Nuevo movimiento</span>
     </a>
@@ -84,8 +86,12 @@
     </main>
   </div>
 </div>
+
+{% include "app/_dialogo_movimiento.html" %}
+<div class="toast" role="status" aria-live="polite" data-toast hidden></div>
 {% endblock %}
 
 {% block scripts %}
 <script src="{{ url_for('static', path='js/app-shell.js') }}" defer></script>
+<script src="{{ url_for('static', path='js/movimiento-dialogo.js') }}" defer></script>
 {% endblock %}

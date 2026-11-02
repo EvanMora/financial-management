@@ -62,3 +62,23 @@ def test_vista_resumen_sin_movimientos_no_divide_por_cero():
     v = vista_resumen(r)
 
     assert v["pct_gastado"] == 0 and v["categorias"] == []
+
+
+def test_resumen_y_movimientos_coinciden():
+    from app.schemas.movimientos import MovimientoEntrada
+    from app.services import movimientos
+
+    nuevo = movimientos.crear(1, MovimientoEntrada(
+        tipo="gasto", monto=Decimal("50000"), categoria_id=3, cuenta_id=1,
+        fecha=date(2026, 10, 31), descripcion="Panadería"))
+    resumen = obtener_resumen(1, 2026, 10)
+
+    assert resumen.gastos_mes == movimientos.listar(1, 2026, 10).gastos == Decimal("1924300")
+    assert resumen.movimientos_recientes[0].id == nuevo.id
+
+
+def test_fecha_larga():
+    from app.web.formato import fecha_larga
+
+    assert fecha_larga(date(2026, 10, 31)) == "Sábado 31 de octubre"
+    assert fecha_larga(date(2026, 11, 2)) == "Lunes 2 de noviembre"
