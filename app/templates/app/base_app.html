@@ -5,6 +5,7 @@
 #}
 {% extends "base.html" %}
 {% import "app/_iconos.html" as iconos %}
+{% import "_logo.html" as logo %}
 
 {% block title %}{% block titulo %}{% endblock %} · {{ app_name }}{% endblock %}
 
@@ -21,10 +22,7 @@
 <div class="shell{% if barra_contraida %} is-collapsed{% endif %}" data-shell>
   <aside class="sidebar" id="barra-lateral" aria-label="Navegación principal">
     <a class="sb-head" href="/resumen" aria-label="{{ app_name }}, ir al resumen">
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <rect width="24" height="24" rx="7" fill="currentColor"/>
-        <path d="M6 16l4.2-4.2 3 3L18.5 9.5" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-      </svg>
+      {{ logo.simbolo() }}
       <span class="sb-label">{{ app_name }}</span>
     </a>
 

@@ -23,7 +23,7 @@ APP_DIR = Path(__file__).resolve().parent.parent
 
 templates = Jinja2Templates(directory=APP_DIR / "templates")
 # Nombre provisional: el equipo aún no lo define (ver docs/alcance.md, decisiones pendientes).
-templates.env.globals["app_name"] = "Mis Finanzas"
+templates.env.globals["app_name"] = "Ziro"
 formato.registrar(templates.env)
 
 router = APIRouter(include_in_schema=False)
