@@ -6,7 +6,8 @@
 (() => {
   const stage = document.querySelector("[data-preview-stage]");
   const preview = stage && stage.querySelector(".preview");
-  if (!preview || getComputedStyle(preview).display === "none") return;
+  // Mismo corte con el que login.css oculta la vista previa, sin forzar el cálculo de estilos.
+  if (!preview || window.matchMedia("(max-width: 1180px)").matches) return;
   if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
 
   const counter = preview.querySelector("[data-count-to]");
@@ -30,26 +31,69 @@
   if (!window.matchMedia("(pointer: fine)").matches) return;
 
   const panels = [...preview.querySelectorAll(".glass")];
+
+  // Medidas guardadas: se leen solo cuando algo las invalida, nunca dentro del frame.
+  let box = null;
+  let border = [0, 0];
+  let offsets = [];
+  let dirty = true;
+  const invalidate = () => { dirty = true; };
+
+  // Posición del panel dentro del escenario, sin transformaciones (entrada ni parallax).
+  const offsetIn = (el) => {
+    let x = 0;
+    let y = 0;
+    for (let node = el; node && node !== stage; node = node.offsetParent) {
+      x += node.offsetLeft;
+      y += node.offsetTop;
+    }
+    return [x, y];
+  };
+
+  const measure = () => {
+    box = stage.getBoundingClientRect();
+    border = [stage.clientLeft, stage.clientTop];
+    offsets = panels.map(offsetIn);
+    dirty = false;
+  };
+
+  window.addEventListener("resize", invalidate);
+  window.addEventListener("scroll", invalidate, { passive: true });
+  stage.addEventListener("pointerenter", invalidate);
+
   let frame = 0;
+  let clientX = 0;
+  let clientY = 0;
+
+  // En el frame solo se escribe.
+  const paint = () => {
+    frame = 0;
+    const px = (clientX - box.left) / box.width - 0.5;
+    const py = (clientY - box.top) / box.height - 0.5;
+    preview.style.setProperty("--px", px.toFixed(3));
+    preview.style.setProperty("--py", py.toFixed(3));
+    // Las columnas se desplazan con el parallax (login.css: --px * -10px, --py * -8px).
+    const left = box.left + border[0] + px * -10;
+    const top = box.top + border[1] + py * -8;
+    panels.forEach((panel, i) => {
+      panel.style.setProperty("--glare-x", `${clientX - left - offsets[i][0]}px`);
+      panel.style.setProperty("--glare-y", `${clientY - top - offsets[i][1]}px`);
+    });
+  };
 
   stage.addEventListener("pointermove", (event) => {
-    cancelAnimationFrame(frame);
-    frame = requestAnimationFrame(() => {
-      const box = stage.getBoundingClientRect();
-      stage.style.setProperty("--px", ((event.clientX - box.left) / box.width - 0.5).toFixed(3));
-      stage.style.setProperty("--py", ((event.clientY - box.top) / box.height - 0.5).toFixed(3));
-      for (const panel of panels) {
-        const rect = panel.getBoundingClientRect();
-        panel.style.setProperty("--glare-x", `${event.clientX - rect.left}px`);
-        panel.style.setProperty("--glare-y", `${event.clientY - rect.top}px`);
-      }
-    });
-  });
+    // Se mide aquí, antes de las escrituras del frame, así la lectura no fuerza estilos.
+    if (dirty) measure();
+    clientX = event.clientX;
+    clientY = event.clientY;
+    frame ||= requestAnimationFrame(paint);
+  }, { passive: true });
 
   stage.addEventListener("pointerleave", () => {
     cancelAnimationFrame(frame);
-    stage.style.removeProperty("--px");
-    stage.style.removeProperty("--py");
+    frame = 0;
+    preview.style.removeProperty("--px");
+    preview.style.removeProperty("--py");
     for (const panel of panels) {
       panel.style.removeProperty("--glare-x");
       panel.style.removeProperty("--glare-y");
