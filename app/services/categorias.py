@@ -21,7 +21,7 @@ from decimal import Decimal
 
 from app.schemas.categorias import Categoria, CategoriaDelMes, CategoriaEntrada, CategoriasDelMes
 from app.schemas.movimientos import CategoriaRef
-from app.services.comun import ErrorValidacion, NoEncontrado, NoPermitido, normalizar
+from app.services.comun import ErrorValidacion, NoEncontrado, NoPermitido, limpiar_texto, normalizar
 
 MAX_NOMBRE = 40
 MAX_PROPIAS = 50  # por usuario
@@ -92,7 +92,7 @@ def _nombre_de_tipo(tipo: str) -> str:
 def _validar(usuario_id: int, entrada: CategoriaEntrada, actual: Categoria | None) -> str:
     """Devuelve el nombre limpio (sin espacios de sobra) o lanza ErrorValidacion."""
     errores: dict[str, str] = {}
-    nombre = " ".join(entrada.nombre.split())
+    nombre = limpiar_texto(entrada.nombre)
     if not nombre:
         errores["nombre"] = "Escribe un nombre."
     elif len(nombre) > MAX_NOMBRE:

@@ -4,7 +4,7 @@ from datetime import date
 from pathlib import Path
 from urllib.parse import urlencode
 
-from fastapi import APIRouter, Query, Request
+from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
@@ -79,6 +79,15 @@ def _periodo(anio: int | None, mes: int | None) -> tuple[int, int]:
     return min((anio, mes), (hoy.year, hoy.month))
 
 
+def _mes_de_url(anio: str | None, mes: str | None) -> tuple[int, int]:
+    """El mes de ?anio=&mes=. Si alguno falta o no es válido (mes=13, anio=abc), el mes actual:
+    una URL mal escrita muestra la página, no un error en JSON."""
+    a, m = _entero(anio), _entero(mes)
+    if a is None or m is None or not (2000 <= a <= 2100 and 1 <= m <= 12):
+        return _periodo(None, None)
+    return _periodo(a, m)
+
+
 def _navegacion_mes(anio: int, mes: int) -> dict:
     hoy = movimientos_servicio.hoy()
     anterior = (anio - 1, 12) if mes == 1 else (anio, mes - 1)
@@ -100,10 +109,10 @@ def login(request: Request):
 @router.get("/resumen", response_class=HTMLResponse)
 def resumen(
     request: Request,
-    anio: int | None = Query(None, ge=2000, le=2100),
-    mes: int | None = Query(None, ge=1, le=12),
+    anio: str | None = None,
+    mes: str | None = None,
 ):
-    anio, mes = _periodo(anio, mes)
+    anio, mes = _mes_de_url(anio, mes)
     datos = obtener_resumen(USUARIO_DEMO["id"], anio, mes)
     presupuesto = presupuestos_servicio.del_mes(USUARIO_DEMO["id"], anio, mes)
     hoy = movimientos_servicio.hoy()
@@ -149,8 +158,8 @@ def _consulta(f: FiltrosMovimientos) -> str:
 @router.get("/movimientos", response_class=HTMLResponse)
 def movimientos(
     request: Request,
-    anio: int | None = Query(None, ge=2000, le=2100),
-    mes: int | None = Query(None, ge=1, le=12),
+    anio: str | None = None,
+    mes: str | None = None,
     tipo: str | None = None,
     cuenta: str | None = None,
     categoria: str | None = None,
@@ -158,7 +167,7 @@ def movimientos(
     nuevo: str | None = None,
     guardado: str | None = None,
 ):
-    anio, mes = _periodo(anio, mes)
+    anio, mes = _mes_de_url(anio, mes)
     filtros = _filtros(tipo, cuenta, categoria, q)
     lista = movimientos_servicio.listar(USUARIO_DEMO["id"], anio, mes, filtros)
     pagos = cuentas_servicio.pagos_del_mes(USUARIO_DEMO["id"], anio, mes, filtros)
@@ -191,11 +200,11 @@ def cuentas(request: Request, guardado: str | None = None):
 @router.get("/categorias", response_class=HTMLResponse)
 def categorias(
     request: Request,
-    anio: int | None = Query(None, ge=2000, le=2100),
-    mes: int | None = Query(None, ge=1, le=12),
+    anio: str | None = None,
+    mes: str | None = None,
     guardado: str | None = None,
 ):
-    anio, mes = _periodo(anio, mes)
+    anio, mes = _mes_de_url(anio, mes)
     datos = categorias_servicio.del_mes(USUARIO_DEMO["id"], anio, mes)
     context = _contexto_app(request, "categorias") | {
         "datos": datos,

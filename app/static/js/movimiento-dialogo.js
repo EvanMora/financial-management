@@ -38,11 +38,16 @@
   const miles = (digitos) => digitos.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
   // Lo escrito en el campo ("184.300"): solo los dígitos.
   const digitosCampo = (texto) => String(texto).replace(/\D/g, "").replace(/^0+(?=\d)/, "");
-  // Un monto de la API ("62000" o "62000.00"): la parte entera.
-  const digitosMonto = (monto) => digitosCampo(String(monto).split(".")[0]);
+  // Un monto de la API ("62000" o "62000.50") en pesos enteros, redondeado como en la lista.
+  const digitosMonto = (monto) => String(Math.round(Number(monto) || 0));
   const dinero = (monto, tipo) => `${tipo === "ingreso" ? "+" : "−"}$${miles(digitosMonto(monto))}`;
+  // El campo solo muestra pesos enteros. Si el movimiento que se edita tiene centavos (posible por
+  // la API), se guarda el monto exacto mientras la persona no lo cambie, para no perderlos.
+  let montoExacto = null;
+  const montoAEnviar = () => montoExacto ?? digitosCampo(campos.monto.value);
 
   campos.monto.addEventListener("input", () => {
+    montoExacto = null;
     const digitos = digitosCampo(campos.monto.value).slice(0, 12);
     campos.monto.value = digitos ? miles(digitos) : "";
   });
@@ -94,7 +99,7 @@
 
   function validar() {
     const errores = {};
-    if (!(Number(digitosCampo(campos.monto.value)) > 0)) errores.monto = "Escribe un monto mayor que 0.";
+    if (!(Number(montoAEnviar()) > 0)) errores.monto = "Escribe un monto mayor que 0.";
     if (!campos.categoria_id.value) errores.categoria_id = "Elige una categoría.";
     if (!campos.cuenta_id.value) errores.cuenta_id = "Elige una cuenta.";
     if (!campos.fecha.value) errores.fecha = "Escribe una fecha válida.";
@@ -125,6 +130,7 @@
     form.elements.tipo.value = movimiento?.tipo ?? "gasto";
     filtrarCategorias();
     campos.monto.value = movimiento ? miles(digitosMonto(movimiento.monto)) : "";
+    montoExacto = movimiento && String(movimiento.monto).includes(".") ? String(movimiento.monto) : null;
     campos.categoria_id.value = movimiento?.categoria_id ?? "";
     campos.cuenta_id.value = movimiento?.cuenta_id ?? "";
     campos.fecha.value = movimiento?.fecha ?? hoy;
@@ -201,7 +207,10 @@
   function aplicarSugerencia(s) {
     form.elements.tipo.value = s.tipo;
     filtrarCategorias();
-    if (s.monto != null) campos.monto.value = miles(digitosMonto(s.monto));
+    if (s.monto != null) {
+      campos.monto.value = miles(digitosMonto(s.monto));
+      montoExacto = null;
+    }
     if (s.categoria_id != null) campos.categoria_id.value = String(s.categoria_id);
     if (s.cuenta_id != null) campos.cuenta_id.value = String(s.cuenta_id);
     if (s.fecha) campos.fecha.value = s.fecha;
@@ -325,7 +334,7 @@
 
     const cuerpo = {
       tipo: tipoElegido(),
-      monto: digitosCampo(campos.monto.value),
+      monto: montoAEnviar(),
       categoria_id: Number(campos.categoria_id.value),
       cuenta_id: Number(campos.cuenta_id.value),
       fecha: campos.fecha.value,

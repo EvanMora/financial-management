@@ -10,7 +10,7 @@ from datetime import date
 from decimal import Decimal
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, StrictInt
 
 Tipo = Literal["ingreso", "gasto"]
 
@@ -57,7 +57,7 @@ class MovimientoEntrada(BaseModel):
     fecha no futura, descripción corta) las valida el servicio."""
     tipo: Tipo
     monto: Decimal = Field(decimal_places=2)
-    categoria_id: int
-    cuenta_id: int
+    categoria_id: StrictInt  # estricto: true no cuenta como 1
+    cuenta_id: StrictInt
     fecha: date
     descripcion: str = ""

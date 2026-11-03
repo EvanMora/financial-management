@@ -13,7 +13,7 @@ from datetime import date
 from decimal import Decimal
 from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, StrictInt
 
 from app.schemas.movimientos import CuentaRef
 
@@ -53,7 +53,7 @@ class CuentaEntrada(BaseModel):
     tono: Tono
     saldo: Decimal | None = None
     cupo: Decimal | None = None
-    dia_pago: int | None = None
+    dia_pago: StrictInt | None = None  # estricto: true no cuenta como el día 1
 
 
 class CuentaConSaldo(BaseModel):
@@ -77,7 +77,7 @@ class PanelCuentas(BaseModel):
 class PagoEntrada(BaseModel):
     """Cuerpo de registrar y editar un pago de tarjeta. La tarjeta va en la URL."""
     monto: Decimal
-    cuenta_origen_id: int
+    cuenta_origen_id: StrictInt  # estricto: true no cuenta como la cuenta 1
     fecha: date
 
 

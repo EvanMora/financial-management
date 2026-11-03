@@ -75,8 +75,13 @@ def test_no_deja_ir_a_meses_futuros():
     assert "month__off" in html  # la flecha "siguiente" está desactivada en el mes actual
 
 
-def test_mes_invalido():
-    assert client.get("/resumen?anio=2026&mes=13").status_code == 422
+def test_mes_invalido_muestra_el_mes_actual():
+    """Una URL mal escrita muestra la página con el mes actual, no un error en JSON."""
+    hoy = date.today()
+    r = client.get("/resumen?anio=2026&mes=13")
+
+    assert r.status_code == 200
+    assert f"{nombre_mes(hoy.month).capitalize()} {hoy.year}" in r.text
 
 
 def test_login_redirige_al_resumen():
