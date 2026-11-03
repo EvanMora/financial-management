@@ -30,7 +30,7 @@ from decimal import Decimal
 
 from app.schemas.cuentas import Cuenta, CuentaConSaldo, CuentaEntrada, Pago, PagoEntrada, PanelCuentas
 from app.schemas.movimientos import CuentaRef, FiltrosMovimientos, Movimiento
-from app.services.comun import ErrorValidacion, NoEncontrado, normalizar
+from app.services.comun import ErrorValidacion, NoEncontrado, limpiar_texto, normalizar
 from app.web.formato import dinero
 
 MAX_NOMBRE = 40
@@ -223,11 +223,11 @@ def panel(usuario_id: int) -> PanelCuentas:
 
 def _validar(usuario_id: int, e: CuentaEntrada, actual: Cuenta | None) -> str:
     """Devuelve el nombre limpio o lanza ErrorValidacion."""
-    from app.services.movimientos import MAX_MONTO
+    from app.services.movimientos import MAX_MONTO, _normalizar_monto
     errores: dict[str, str] = {}
     tarjeta = es_tarjeta(e.tipo)
 
-    nombre = " ".join(e.nombre.split())
+    nombre = limpiar_texto(e.nombre)
     if not nombre:
         errores["nombre"] = "Escribe un nombre."
     elif len(nombre) > MAX_NOMBRE:
@@ -244,7 +244,7 @@ def _validar(usuario_id: int, e: CuentaEntrada, actual: Cuenta | None) -> str:
         errores["saldo"] = "El monto es demasiado grande."
 
     if tarjeta:
-        if e.cupo is None or not e.cupo.is_finite() or e.cupo <= 0:
+        if e.cupo is None or not e.cupo.is_finite() or _normalizar_monto(e.cupo) <= 0:
             errores["cupo"] = "Escribe un cupo mayor que 0."
         elif e.cupo >= MAX_MONTO:
             errores["cupo"] = "El monto es demasiado grande."
@@ -376,6 +376,9 @@ def _validar_pago(usuario_id: int, tarjeta: Cuenta, e: PagoEntrada, pago_id: int
         errores["monto"] = "El monto es demasiado grande."
     else:
         monto = movimientos._normalizar_monto(e.monto)
+        if monto <= 0:  # "0.001" pasa "> 0" pero se guardaría como 0,00
+            errores["monto"] = "Escribe un monto mayor que 0."
+            monto = None
 
     origen = obtener(usuario_id, e.cuenta_origen_id)
     if origen is None or es_tarjeta(origen.tipo):
