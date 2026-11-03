@@ -218,9 +218,8 @@ def categorias(
 # ---------- Presupuestos ----------
 
 @router.get("/presupuestos", response_class=HTMLResponse)
-def presupuestos(request: Request, anio: int | None = Query(None, ge=2000, le=2100),
-                 mes: int | None = Query(None, ge=1, le=12)):
-    anio, mes = _periodo(anio, mes)
+def presupuestos(request: Request, anio: str | None = None, mes: str | None = None):
+    anio, mes = _mes_de_url(anio, mes)
     hoy = movimientos_servicio.hoy()
     usuario = USUARIO_DEMO["id"]
     datos = presupuestos_servicio.del_mes(usuario, anio, mes)
@@ -236,11 +235,11 @@ def presupuestos(request: Request, anio: int | None = Query(None, ge=2000, le=21
 
 
 @router.get("/presupuestos/nuevo", response_class=HTMLResponse)
-def presupuesto_nuevo(request: Request, anio: int | None = Query(None, ge=2000, le=2100),
-                      mes: int | None = Query(None, ge=1, le=12), volver: str | None = None):
+def presupuesto_nuevo(request: Request, anio: str | None = None, mes: str | None = None,
+                      volver: str | None = None):
     """Crear (o editar) el presupuesto del mes: un monto por categoría de gasto. "volver" es la
     pantalla a la que se regresa al guardar o cancelar: el Resumen o Presupuestos (la de siempre)."""
-    anio, mes = _periodo(anio, mes)
+    anio, mes = _mes_de_url(anio, mes)
     if volver != "resumen":
         volver = "presupuestos"
     usuario = USUARIO_DEMO["id"]
