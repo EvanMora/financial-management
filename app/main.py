@@ -9,6 +9,7 @@ from app.api import categorias as api_categorias
 from app.api import cuentas as api_cuentas
 from app.api import ia as api_ia
 from app.api import movimientos as api_movimientos
+from app.api import presupuestos as api_presupuestos
 from app.web import views
 
 # Variables del archivo .env (p. ej. GEMINI_API_KEY). Las que ya existan en el entorno no se pisan.
@@ -34,6 +35,7 @@ app.include_router(api_categorias.router)
 app.include_router(api_cuentas.router)
 app.include_router(api_cuentas.router_pagos)
 app.include_router(api_ia.router)
+app.include_router(api_presupuestos.router)
 
 
 @app.get("/", include_in_schema=False)

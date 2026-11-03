@@ -1,6 +1,6 @@
 import pytest
 
-from app.services import categorias, cuentas, ia, movimientos
+from app.services import categorias, cuentas, ia, movimientos, presupuestos
 
 
 @pytest.fixture(autouse=True)
@@ -13,9 +13,11 @@ def _almacen_de_movimientos_limpio():
     cuentas.reiniciar()
     ia.reiniciar_limite()
     ia.reiniciar_cache_analisis()
+    presupuestos.reiniciar()
     yield
     movimientos.reiniciar()
     categorias.reiniciar()
     cuentas.reiniciar()
     ia.reiniciar_limite()
     ia.reiniciar_cache_analisis()
+    presupuestos.reiniciar()

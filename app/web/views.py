@@ -13,9 +13,11 @@ from app.services import categorias as categorias_servicio
 from app.services import cuentas as cuentas_servicio
 from app.services import ia as ia_servicio
 from app.services import movimientos as movimientos_servicio
+from app.services import presupuestos as presupuestos_servicio
 from app.services.dashboard import obtener_resumen
 from app.web import formato
 from app.web.presentacion import datos_pago, vista_categorias, vista_cuentas, vista_movimientos, vista_resumen
+from app.web import presupuestos_vista
 from app.web.preview import build_preview
 from app.web.sesion import USUARIO_DEMO
 
@@ -37,8 +39,9 @@ SECCIONES = [
     ("movimientos", "Movimientos", "movimientos"),
     ("cuentas", "Cuentas", "cuentas"),
     ("categorias", "Categorías", "categorias"),
+    ("presupuestos", "Presupuestos", "presupuestos"),
 ]
-PROXIMAMENTE = [("Presupuestos", "presupuestos"), ("Metas", "metas")]
+PROXIMAMENTE = [("Metas", "metas")]
 
 
 
@@ -102,10 +105,15 @@ def resumen(
 ):
     anio, mes = _periodo(anio, mes)
     datos = obtener_resumen(USUARIO_DEMO["id"], anio, mes)
+    presupuesto = presupuestos_servicio.del_mes(USUARIO_DEMO["id"], anio, mes)
+    hoy = movimientos_servicio.hoy()
     context = _contexto_app(request, "resumen") | {
         "resumen": datos,
         "vista": vista_resumen(datos),
         "periodo": _navegacion_mes(anio, mes),
+        "presupuesto": presupuesto,
+        "vista_presupuesto": presupuestos_vista.resumen(presupuesto),
+        "es_mes_actual": (anio, mes) == (hoy.year, hoy.month),
     }
     return templates.TemplateResponse(request, "app/resumen.html", context)
 
@@ -196,3 +204,50 @@ def categorias(
         "guardado": _entero(guardado),
     }
     return templates.TemplateResponse(request, "app/categorias.html", context)
+
+
+# ---------- Presupuestos ----------
+
+@router.get("/presupuestos", response_class=HTMLResponse)
+def presupuestos(request: Request, anio: int | None = Query(None, ge=2000, le=2100),
+                 mes: int | None = Query(None, ge=1, le=12)):
+    anio, mes = _periodo(anio, mes)
+    hoy = movimientos_servicio.hoy()
+    usuario = USUARIO_DEMO["id"]
+    datos = presupuestos_servicio.del_mes(usuario, anio, mes)
+    gastos = presupuestos_servicio.gastos_del_mes(usuario, anio, mes)
+    context = _contexto_app(request, "presupuestos") | {
+        "datos": datos,
+        "vista": presupuestos_vista.resumen(datos),
+        "cal": presupuestos_vista.calendario(datos, hoy, gastos),
+        "periodo": _navegacion_mes(anio, mes),
+        "es_mes_actual": (anio, mes) == (hoy.year, hoy.month),
+    }
+    return templates.TemplateResponse(request, "app/presupuestos.html", context)
+
+
+@router.get("/presupuestos/nuevo", response_class=HTMLResponse)
+def presupuesto_nuevo(request: Request, anio: int | None = Query(None, ge=2000, le=2100),
+                      mes: int | None = Query(None, ge=1, le=12), volver: str | None = None):
+    """Crear (o editar) el presupuesto del mes: un monto por categoría de gasto. "volver" es la
+    pantalla a la que se regresa al guardar o cancelar: el Resumen o Presupuestos (la de siempre)."""
+    anio, mes = _periodo(anio, mes)
+    if volver != "resumen":
+        volver = "presupuestos"
+    usuario = USUARIO_DEMO["id"]
+    actual = presupuestos_servicio.del_mes(usuario, anio, mes)
+    limites = {c.categoria.id: c.limite for c in actual.categorias}
+    ant_anio, ant_mes = (anio - 1, 12) if mes == 1 else (anio, mes - 1)
+    anterior = {f.categoria.id: f.total for f in categorias_servicio.del_mes(usuario, ant_anio, ant_mes).gastos}
+    filas = [{"categoria": c, "limite": limites.get(c.id), "mes_anterior": anterior.get(c.id, 0)}
+             for c in categorias_servicio.listar(usuario) if c.tipo == "gasto"]
+    context = _contexto_app(request, volver) | {
+        "anio": anio,
+        "mes": mes,
+        "mes_anterior": ant_mes,
+        "editando": actual.creado,
+        "filas": filas,
+        "total": actual.total,
+        "volver": f"/{volver}?anio={anio}&mes={mes}",
+    }
+    return templates.TemplateResponse(request, "app/presupuesto_nuevo.html", context)
