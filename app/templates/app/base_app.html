@@ -9,10 +9,41 @@
 
 {% block title %}{% block titulo %}{% endblock %} · {{ app_name }}{% endblock %}
 
-{% block head %}
-{# Antes de pintar: los estilos saben que hay JS (p. ej. ocultan el botón "Filtrar"). #}
+{% block head_inicio %}
+{# Antes de pintar: los estilos saben que hay JS (p. ej. ocultan el botón "Filtrar"). Va antes de los
+   <link> de CSS: un script en línea detrás de una hoja de estilos espera a que esta cargue. #}
 <script>document.documentElement.classList.add("js");</script>
-<link rel="stylesheet" href="{{ url_for('static', path='css/app.css') }}">
+{#
+  Cambiar de mes no anima: si la página es la misma y solo cambian "anio" o "mes", se salta la
+  View Transition (con ella el clic tardaba ~185 ms más en pintar). Entre secciones sí anima.
+  - pageswap (página que se va): saltarla aquí evita capturar la vista vieja y la salida vt-fuera.
+  - pagereveal (página que llega): por si la vieja no la saltó. Se dispara antes del primer
+    pintado, así que el oyente tiene que estar aquí, en línea; desde un script defer llega tarde.
+  Sin Navigation API (navigation.activation) no se salta nada y la animación sigue como antes.
+#}
+<script>
+  (() => {
+    const soloMes = (a, b) => {
+      if (!a || !b) return false;
+      const x = new URL(a), y = new URL(b);
+      if (x.origin !== y.origin || x.pathname !== y.pathname) return false;
+      for (const u of [x, y]) { u.searchParams.delete("anio"); u.searchParams.delete("mes"); u.searchParams.sort(); }
+      return x.search === y.search;
+    };
+    // Saltarla rechaza la promesa "ready" con AbortError; se atrapa para que no salga en la consola.
+    const saltar = (vt) => { vt.ready.catch(() => {}); vt.skipTransition(); };
+    addEventListener("pageswap", (e) => {
+      if (e.viewTransition && soloMes(location.href, e.activation?.entry?.url)) saltar(e.viewTransition);
+    });
+    addEventListener("pagereveal", (e) => {
+      if (e.viewTransition && soloMes(window.navigation?.activation?.from?.url, location.href)) saltar(e.viewTransition);
+    });
+  })();
+</script>
+{% endblock %}
+
+{% block head %}
+<link rel="stylesheet" href="{{ static('css/app.css') }}">
 {% block estilos %}{% endblock %}
 {% endblock %}
 
@@ -92,7 +123,7 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="{{ url_for('static', path='js/app-shell.js') }}" defer></script>
-<script src="{{ url_for('static', path='js/movimiento-dialogo.js') }}" defer></script>
-<script src="{{ url_for('static', path='js/desplegable.js') }}" defer></script>
+<script src="{{ static('js/app-shell.js') }}" defer></script>
+<script src="{{ static('js/movimiento-dialogo.js') }}" defer></script>
+<script src="{{ static('js/desplegable.js') }}" defer></script>
 {% endblock %}
