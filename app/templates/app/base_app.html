@@ -1,0 +1,98 @@
+{#
+  Estructura de la app: barra lateral + barra superior + contenido de la sección.
+  Cada sección es una página propia (una ruta por sección); la animación entre ellas la hace
+  el navegador con View Transitions (ver app.css). La barra lateral no se anima: se queda quieta.
+#}
+{% extends "base.html" %}
+{% import "app/_iconos.html" as iconos %}
+{% import "_logo.html" as logo %}
+
+{% block title %}{% block titulo %}{% endblock %} · {{ app_name }}{% endblock %}
+
+{% block head %}
+{# Antes de pintar: los estilos saben que hay JS (p. ej. ocultan el botón "Filtrar"). #}
+<script>document.documentElement.classList.add("js");</script>
+<link rel="stylesheet" href="{{ url_for('static', path='css/app.css') }}">
+{% block estilos %}{% endblock %}
+{% endblock %}
+
+{% block body_class %}app-page{% endblock %}
+
+{% block body %}
+<div class="shell{% if barra_contraida %} is-collapsed{% endif %}" data-shell>
+  <aside class="sidebar" id="barra-lateral" aria-label="Navegación principal">
+    <a class="sb-head" href="/resumen" aria-label="{{ app_name }}, ir al resumen">
+      {{ logo.simbolo() }}
+      <span class="sb-label">{{ app_name }}</span>
+    </a>
+
+    <a class="btn btn--ink sb-new" href="/movimientos?nuevo=1" title="Nuevo movimiento" data-nuevo-movimiento>
+      <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3v10M3 8h10"/></svg>
+      <span class="sb-label">Nuevo movimiento</span>
+    </a>
+
+    <nav class="sb-nav-wrap">
+      <ul class="sb-nav">
+        {% for ruta, nombre, icono in secciones %}
+        <li>
+          {% if ruta == seccion %}<span class="sb-indicator" aria-hidden="true"></span>{% endif %}
+          <a class="sb-item" href="/{{ ruta }}" title="{{ nombre }}"{% if ruta == seccion %} aria-current="page"{% endif %}>
+            {{ iconos.seccion(icono) }}<span class="sb-label">{{ nombre }}</span>
+          </a>
+        </li>
+        {% endfor %}
+      </ul>
+
+      <p class="sb-group">Próximamente</p>
+      <ul class="sb-nav">
+        {% for nombre, icono in proximamente %}
+        <li>
+          <span class="sb-item" aria-disabled="true" title="{{ nombre }} (Fase 2)">
+            {{ iconos.seccion(icono) }}<span class="sb-label">{{ nombre }}</span><span class="sb-soon sb-label">Fase 2</span>
+          </span>
+        </li>
+        {% endfor %}
+      </ul>
+    </nav>
+
+    <div class="sb-foot">
+      <div class="sb-user">
+        <span class="avatar" aria-hidden="true">{{ usuario.iniciales }}</span>
+        <span class="sb-label">{{ usuario.nombre }}<span class="sub">{{ usuario.correo }}</span></span>
+      </div>
+      <button class="sb-toggle" type="button" aria-controls="barra-lateral"
+              aria-expanded="{{ 'false' if barra_contraida else 'true' }}" data-collapse>
+        <svg viewBox="0 0 20 20" aria-hidden="true"><rect x="2.5" y="3.5" width="15" height="13" rx="3"/><path d="M7.5 3.5v13M13 8l-2 2 2 2"/></svg>
+        <span class="sb-label" data-collapse-label>{{ "Expandir barra" if barra_contraida else "Contraer barra" }}</span>
+      </button>
+    </div>
+  </aside>
+
+  <div class="scrim" data-scrim></div>
+
+  <div class="main">
+    <header class="topbar">
+      <button class="topbar__menu" type="button" aria-label="Abrir menú" aria-controls="barra-lateral" aria-expanded="false" data-menu>
+        <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 6h14M3 10h14M3 14h14"/></svg>
+      </button>
+      <h1 class="topbar__title">{{ self.titulo() }}</h1>
+      <div class="topbar__end">{% block acciones %}{% endblock %}</div>
+    </header>
+
+    <main class="view" id="contenido">
+      {% block contenido %}{% endblock %}
+    </main>
+  </div>
+</div>
+
+{% include "app/_dialogo_movimiento.html" %}
+{# Diálogos propios de una sección. Van fuera de .view para no heredar su animación de entrada. #}
+{% block dialogos %}{% endblock %}
+<div class="toast" role="status" aria-live="polite" data-toast hidden></div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', path='js/app-shell.js') }}" defer></script>
+<script src="{{ url_for('static', path='js/movimiento-dialogo.js') }}" defer></script>
+<script src="{{ url_for('static', path='js/desplegable.js') }}" defer></script>
+{% endblock %}
