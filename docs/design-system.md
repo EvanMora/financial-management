@@ -24,6 +24,18 @@ Los tokens viven en `app/static/css/tokens.css`. Este documento explica de dónd
 | Fotografía de producto como protagonista | Las cifras y gráficas son las protagonistas | No hay producto físico que mostrar |
 | SF Pro | Inter en todos los dispositivos | SF Pro no tiene licencia para uso web; Inter es libre, muy parecida y se ve igual en cualquier equipo |
 
+## Logo
+
+La app se llama **Ziro** (se lee como "zero": el saldo cuadrado). El nombre está en un solo lugar, `app_name` en `app/web/views.py`.
+
+**El símbolo ("Flujo")** es una Z hecha de dos trazos iguales girados 180°: uno baja (lo que sale) y el otro sube (lo que entra). La Z es un recorte transparente de un cuadrado redondeado.
+
+- **En las plantillas**, usa el macro `simbolo()` de `app/templates/_logo.html`. Toma el color del texto (`currentColor`), así que se adapta solo al fondo. No lo copies a mano.
+- **El nombre va en texto**, en Inter 600, al lado del símbolo, como en la barra lateral y la barra del login.
+- **Un solo color:** `--color-text` (`#1d1d1f`), o `#f5f5f7` sobre fondos oscuros. Sin azul ni verde.
+- **Tamaño mínimo: 20px.** Por debajo, las dos diagonales se juntan y se pierde el corte. La excepción es el favicon de 16px, donde no hay alternativa.
+- **Íconos de archivo** en `app/static/img/`: `favicon.svg` (se aclara en pestañas oscuras), `favicon-32.png` y `apple-touch-icon.png` (180px, a sangre: el sistema aplica la máscara).
+
 ## Reglas de color
 
 - `--color-primary` (`#0071e3`) se usa **solo** como relleno del botón primario. Nunca como fondo de sección, texto o icono.

@@ -4,6 +4,8 @@ Los números son coherentes entre sí: el ahorro de octubre es ingresos − gast
 por categoría suman el gasto del mes y los presupuestos usan esas mismas categorías.
 """
 
+from functools import cache
+
 MONTHS = ["nov", "dic", "ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct"]
 SAVINGS = [420_000, 260_000, 610_000, 540_000, 390_000, 720_000, 680_000, 510_000, 830_000, 760_000, 1_180_000]
 BALANCE = [2_310_000, 2_420_000, 2_650_000, 2_580_000, 2_890_000, 3_020_000, 2_950_000, 3_210_000,
@@ -36,6 +38,8 @@ def _sparkline():
     return {"line": line, "area": area, "end": points[-1], "width": SPARK_WIDTH, "height": SPARK_HEIGHT}
 
 
+# Solo depende de constantes: se calcula una vez. La plantilla solo lee el resultado; no mutarlo.
+@cache
 def build_preview():
     expenses = sum(amount for _, amount in EXPENSES_BY_CATEGORY)
     savings = SAVINGS + [INCOME - expenses]

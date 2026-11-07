@@ -4,6 +4,7 @@
 
 {% block estilos %}
 <link rel="stylesheet" href="{{ url_for('static', path='css/resumen.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', path='css/presupuestos.css') }}">
 {% endblock %}
 
 {% block acciones %}
@@ -13,6 +14,27 @@
 
 {% block contenido %}
 {% set mes = resumen.mes | nombre_mes %}
+{# Presupuesto del mes: solo la barra de lo que queda. El detalle está en la sección Presupuestos. #}
+{% if presupuesto.creado %}
+<a class="pres-barra pres-barra--{{ presupuesto.estado }}" href="/presupuestos?anio={{ resumen.anio }}&amp;mes={{ resumen.mes }}" style="--i: 0">
+  <span class="pres-barra__fila">
+    <strong class="pres-barra__titulo num">{{ vista_presupuesto.nota }}</strong>
+    <span class="sub num">de {{ presupuesto.total | dinero }}</span>
+  </span>
+  <span class="pres-pista" role="img" aria-label="Llevas el {{ presupuesto.pct | porcentaje }} del presupuesto">
+    <span class="pres-pista__relleno" style="width: {{ vista_presupuesto.ancho }}%"></span>
+  </span>
+  <span class="sub">Llevas el {{ presupuesto.pct | porcentaje }} del presupuesto de {{ mes }} · <span class="pres-barra__ver">Ver presupuestos</span></span>
+</a>
+{% elif es_mes_actual %}
+<section class="pres-barra pres-barra--vacia" style="--i: 0" aria-label="Presupuesto de {{ mes }}">
+  <span>
+    <strong class="pres-barra__titulo">Nuevo mes, nuevo presupuesto</strong>
+    <span class="sub">Crea el presupuesto de {{ mes }} para ver cuánto te queda.</span>
+  </span>
+  <a class="btn btn--ink" href="/presupuestos/nuevo?anio={{ resumen.anio }}&amp;mes={{ resumen.mes }}&amp;volver=resumen">Crear presupuesto</a>
+</section>
+{% endif %}
 <section class="stage" style="--i: 0" aria-label="Resumen de {{ mes }}">
   <div class="stage__summary">
     <p class="label">Saldo total</p>

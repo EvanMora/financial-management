@@ -29,13 +29,29 @@
   if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
   if (!window.matchMedia("(pointer: fine)").matches) return;
 
-  let frame = 0;
-  document.addEventListener("pointermove", (event) => {
-    cancelAnimationFrame(frame);
-    frame = requestAnimationFrame(() => {
-      const rect = card.getBoundingClientRect();
-      card.style.setProperty("--glare-x", `${event.clientX - rect.left}px`);
-      card.style.setProperty("--glare-y", `${event.clientY - rect.top}px`);
-    });
+  // El reflejo solo se mueve con el cursor dentro del escenario que contiene la tarjeta.
+  const stage = card.closest("[data-preview-stage]") || document;
+
+  // Posición guardada: se mide solo cuando algo la invalida, nunca al escribir.
+  let rect = null;
+  let dirty = true;
+  const invalidate = () => { dirty = true; };
+  window.addEventListener("resize", invalidate);
+  window.addEventListener("scroll", invalidate, { passive: true });
+  stage.addEventListener("pointerenter", invalidate);
+  // La entrada mueve y escala la tarjeta; al terminar queda en su sitio definitivo.
+  card.addEventListener("animationend", (event) => {
+    if (event.animationName === "card-in") dirty = true;
   });
+
+  // Sin rAF propio: son solo dos escrituras y el navegador ya entrega pointermove una vez
+  // por frame; la lectura (si hace falta) va antes de cualquier escritura del frame.
+  stage.addEventListener("pointermove", (event) => {
+    if (dirty) {
+      rect = card.getBoundingClientRect();
+      dirty = false;
+    }
+    card.style.setProperty("--glare-x", `${event.clientX - rect.left}px`);
+    card.style.setProperty("--glare-y", `${event.clientY - rect.top}px`);
+  }, { passive: true });
 })();

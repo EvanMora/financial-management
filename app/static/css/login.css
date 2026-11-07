@@ -68,11 +68,12 @@
   max-width: 420px;
   padding: var(--space-32) var(--card-padding) var(--card-padding);
   background: rgba(255, 255, 255, 0.86);
-  -webkit-backdrop-filter: blur(28px) saturate(1.8);
-  backdrop-filter: blur(28px) saturate(1.8);
+  /* 12px basta: el fondo al 86 % ya tapa casi todo y cada px de radio cuesta en cada frame. */
+  -webkit-backdrop-filter: blur(12px) saturate(1.8);
+  backdrop-filter: blur(12px) saturate(1.8);
   border-radius: var(--radius-card);
   box-shadow: var(--glass-edge);
-  animation: card-in 640ms var(--ease-emphasized) both;
+  animation: card-in 300ms var(--ease-emphasized) both;
 }
 
 /* Reflejo especular. */
@@ -86,7 +87,10 @@
   pointer-events: none;
 }
 
-/* Haz de luz en el borde: una vuelta al aparecer; en bucle mientras carga. */
+/* Haz de luz en el borde: una vuelta al aparecer; en bucle mientras carga.
+   Sigue girando con --rim-angle: rotarlo con transform exigiría un contenedor quieto con la
+   máscara del aro y el degradado girando dentro, y un pseudo-elemento no puede tener hijos.
+   Al menos va en su propia capa: cada vuelta repinta el aro, no el texto de la tarjeta. */
 .login-card::after {
   position: absolute;
   inset: 0;
@@ -99,7 +103,8 @@
   -webkit-mask-composite: xor;
   mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
   pointer-events: none;
-  animation: rim-sweep 1400ms var(--ease-out) 380ms both;
+  will-change: transform;
+  animation: rim-sweep 1400ms var(--ease-out) 180ms both;
 }
 
 .login-card.is-busy::after {
@@ -120,10 +125,10 @@
   animation: card-shake 360ms var(--ease-out);
 }
 
+/* Solo opacidad y transformación: se animan en el compositor. */
 @keyframes card-in {
   from {
     opacity: 0;
-    filter: blur(8px);
     transform: translateY(20px) scale(0.96);
   }
 }
@@ -173,26 +178,23 @@
   }
 }
 
-/* Cada bloque entra en cascada después de la tarjeta. */
+/* Cada bloque entra en cascada junto con la tarjeta: todo el contenido está en unos 280 ms.
+   La alerta usa alert-in de styles.css (.alert:not([hidden]) pesa más que .login-form > *). */
 .login-card__head > *,
 .login-form > *,
 .login-card__footer {
-  animation: rise-in 420ms var(--ease-emphasized) both;
+  animation: rise-in 160ms var(--ease-emphasized) both;
 }
 
-.login-card__mark { animation-delay: 160ms; }
-.login-card__greeting { animation-delay: 220ms; }
-.login-card__title { animation-delay: 270ms; }
-.login-card__lead { animation-delay: 320ms; }
-.login-form > :nth-child(2) { animation-delay: 380ms; }
-.login-form > :nth-child(3) { animation-delay: 430ms; }
-.login-form > :nth-child(4) { animation-delay: 480ms; }
-.login-form > :nth-child(5) { animation-delay: 530ms; }
-.login-card__footer { animation-delay: 590ms; }
-
-.login-form > .alert {
-  animation: alert-in var(--duration-slow) var(--ease-emphasized);
-}
+.login-card__mark { animation-delay: 20ms; }
+.login-card__greeting { animation-delay: 32ms; }
+.login-card__title { animation-delay: 44ms; }
+.login-card__lead { animation-delay: 56ms; }
+.login-form > :nth-child(2) { animation-delay: 68ms; }
+.login-form > :nth-child(3) { animation-delay: 80ms; }
+.login-form > :nth-child(4) { animation-delay: 92ms; }
+.login-form > :nth-child(5) { animation-delay: 104ms; }
+.login-card__footer { animation-delay: 116ms; }
 
 @keyframes rise-in {
   from {
@@ -207,46 +209,36 @@
   align-items: flex-start;
 }
 
-/* Marca: una baldosa de tinta cuya línea de tendencia se dibuja sola. */
+/* Marca: el símbolo de Ziro (ver _logo.html). La baldosa de tinta tiene sus proporciones (radio de
+   120/512) y la Z se dibuja sola: primero el trazo que baja (lo que sale) y luego el que sube (lo que entra). */
 .login-card__mark {
-  display: grid;
-  place-items: center;
+  display: block;
   width: 48px;
   height: 48px;
   margin-bottom: var(--space-20);
   background: var(--color-text);
-  border-radius: 14px;
+  border-radius: 11px;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25);
 }
 
 .login-card__mark svg {
-  width: 40px;
-  height: 40px;
-  overflow: visible;
+  display: block;
+  width: 100%;
+  height: 100%;
 }
 
 .login-card__mark-line {
   fill: none;
   stroke: var(--color-on-primary);
-  stroke-width: 2.4;
+  stroke-width: 58.24;
   stroke-linecap: round;
   stroke-linejoin: round;
   stroke-dasharray: 1;
-  animation: pv-draw 700ms var(--ease-emphasized) 420ms both;
+  animation: pv-draw 560ms var(--ease-emphasized) 140ms both;
 }
 
-.login-card__mark-dot {
-  fill: #7cc792;
-  transform-box: fill-box;
-  transform-origin: center;
-  animation: pv-pop 260ms var(--ease-emphasized) 1050ms both, dot-glow 2400ms ease-in-out 1400ms infinite;
-}
-
-@keyframes dot-glow {
-  50% {
-    transform: scale(1.35);
-    opacity: 0.75;
-  }
+.login-card__mark-line--entra {
+  animation-delay: 480ms;
 }
 
 .login-card__greeting {
@@ -334,6 +326,8 @@
  * con brillo en el borde) porque flotan sobre la gráfica de fondo. Siguen sin sombras.
  */
 .preview {
+  /* Desenfoque más corto que el del token: los paneles se repintan al mover el cursor. */
+  --glass-blur: blur(12px) saturate(1.8);
   position: absolute;
   inset: 0;
   pointer-events: none;
@@ -363,12 +357,11 @@
   align-items: flex-end;
 }
 
-/* Barras de vidrio verde: translúcidas, con brillo en el borde superior y desenfoque. */
+/* Barras de vidrio verde: translúcidas, con brillo en el borde superior.
+   Sin backdrop-filter: detrás solo está el gris liso del escenario, así que no cambiaba nada. */
 .pv-savings__col {
   width: 100%;
   background: linear-gradient(180deg, rgba(124, 199, 146, 0.55) 0%, rgba(255, 255, 255, 0.35) 100%);
-  -webkit-backdrop-filter: blur(6px) saturate(1.6);
-  backdrop-filter: blur(6px) saturate(1.6);
   border-radius: var(--radius-card) var(--radius-card) 0 0;
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.95),
@@ -736,6 +729,12 @@
 
   .login-stage {
     min-height: 0;
+  }
+
+  /* Sin vista previa detrás solo queda el gris liso: el desenfoque no aporta nada. */
+  .login-card {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
   }
 }
 

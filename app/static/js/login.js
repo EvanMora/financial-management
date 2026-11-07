@@ -67,6 +67,23 @@
     card?.classList.toggle("is-busy", loading);
   }
 
+  // Navega cuando termina de dibujarse el check (draw-check, 360 ms en styles.css).
+  // Tope de seguridad por si animationend no llega; con movimiento reducido, sin espera.
+  function goAfterCheck(url) {
+    if (reduceMotion) {
+      window.location.assign(url);
+      return;
+    }
+    let gone = false;
+    const go = () => {
+      if (gone) return;
+      gone = true;
+      window.location.assign(url);
+    };
+    submit.querySelector(".btn__check")?.addEventListener("animationend", go, { once: true });
+    setTimeout(go, 400);
+  }
+
   function setSuccess() {
     submit.classList.remove("is-loading");
     submit.classList.add("is-success");
@@ -84,13 +101,19 @@
   }
 
   // Solo con mouse: en celulares el foco automático abre el teclado y tapa el titular.
-  if (window.matchMedia("(pointer: fine)").matches) email.focus();
+  // En el siguiente frame, para no forzar el primer estilo y layout dentro de esta tarea.
+  // Si la persona ya puso el foco en otro sitio, se respeta.
+  if (window.matchMedia("(pointer: fine)").matches) {
+    requestAnimationFrame(() => {
+      if (document.activeElement === document.body || !document.activeElement) email.focus();
+    });
+  }
 
   // Corregir un campo borra su error al momento; no hace falta volver a enviar.
   [email, password].forEach((input) => {
     input.addEventListener("input", () => {
       if (input.hasAttribute("aria-invalid")) setFieldError(input, null);
-      showAlert("");
+      if (!alertBox.hidden) showAlert(""); // no tocar el DOM en cada tecla si ya está oculta
     });
   });
 
@@ -107,7 +130,9 @@
   });
 
   const updateCapsHint = (event) => {
-    if (event.getModifierState) capsHint.hidden = !event.getModifierState("CapsLock");
+    if (!event.getModifierState) return;
+    const hidden = !event.getModifierState("CapsLock");
+    if (capsHint.hidden !== hidden) capsHint.hidden = hidden;
   };
   password.addEventListener("keydown", updateCapsHint);
   password.addEventListener("keyup", updateCapsHint);
@@ -141,8 +166,7 @@
 
       if (response.ok) {
         setSuccess();
-        // Deja ver el check antes de navegar.
-        setTimeout(() => window.location.assign(form.dataset.redirect || "/"), reduceMotion ? 0 : 650);
+        goAfterCheck(form.dataset.redirect || "/resumen");
         return;
       }
 
